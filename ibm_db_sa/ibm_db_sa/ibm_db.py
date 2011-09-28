@@ -14,8 +14,8 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Alex Pitigoi, Abhigyan Agrawal                                  |
-# | Updater: Jaimy Azle                                                      |
-# | Version:                                                                 |
+# | Contributor: Jaimy Azle                                                  |
+# | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 
 from sqlalchemy import schema, sql, util
@@ -24,10 +24,10 @@ from sqlalchemy.engine import reflection
 from ibm_db_sa import base as ibm_base
 
 class IBM_DB_SAExecutionContext(ibm_base.IBM_DBExecutionContext):
-  
+
   def get_lastrowid(self):
     return self.cursor.last_identity_val
-    
+
 class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
 
   driver                        = 'ibm_db_sa'
@@ -43,7 +43,7 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
         ibm_base.IBM_DBDialect.colspecs,
         {
         }
-    )       
+    )
 
   def __init__(self, use_ansiquotes=None, **kwargs):
     super(IBM_DB_SADialect, self).__init__(**kwargs)
@@ -136,6 +136,8 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
     """
     if schema is None:
         schema = self._get_default_schema_name(connection)
+    else:
+        connection.connection.set_current_schema(schema)
     table = connection.connection.tables(schema, table_name)
     has_it = table is not None and \
              len(table) is not 0 \
@@ -145,59 +147,60 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
   # Retrieves a list of table names for a given schema
   @reflection.cache
   def get_table_names(self, connection, schema = None, **kw):
-    """ Inputs: - sqlalchemy.engine.base.Connection object has a <connection> reference
-                  to sqlalchemy.pool._ConnectionFairy which has a <connection> reference
-                  to sqlalchemy.databases.ibm_db_dbi.Connection, the actual DBAPI
-                  driver connection handler
-                - schema string, if not using the default schema
-        Returns: List of strings representing table names
-    """
     if schema is None:
-        schema = self._get_default_schema_name(connection)
-    tables = connection.connection.tables(schema)        
+      schema = self._get_default_schema_name(connection)
+    else:
+      connection.connection.set_current_schema(schema)
+    tables = connection.connection.tables(schema)
     return [table['TABLE_NAME'].lower() for table in tables]
-    
+
   @reflection.cache
-  def get_columns(self, connection, table_name, schema=None, **kw):   
+  def get_columns(self, connection, table_name, schema=None, **kw):
     if schema is None:
-        schema = self._get_default_schema_name(connection)           
-      
+      schema = self._get_default_schema_name(connection)
+    else:
+      connection.connection.set_current_schema(schema)
+
     columns = connection.connection.columns(schema, table_name)
     sa_columns = []
     for column in columns:
-      coltype = column['TYPE_NAME'].upper()      
+      coltype = column['TYPE_NAME'].upper()
       if coltype == 'DECIMAL':
         coltype = self.ischema_names.get(coltype)(column['COLUMN_SIZE'], column['DECIMAL_DIGITS'])
       elif coltype in ['CHAR', 'VARCHAR']:
-        coltype = self.ischema_names.get(coltype)(column['COLUMN_SIZE'])        
+        coltype = self.ischema_names.get(coltype)(column['COLUMN_SIZE'])
       else:
         try:
           coltype = self.ischema_names[coltype]
         except KeyError:
           util.warn("Did not recognize type '%s' of column '%s'" % (coltype, column['COLUMN_NAME']))
-          coltype = sa_types.NULLTYPE                          
+          coltype = sa_types.NULLTYPE
       sa_columns.append({
           'name' : column['COLUMN_NAME'],
           'type' : coltype,
           'nullable' : column['NULLABLE'] == 1,
           'default' : column['COLUMN_DEF'],
           'autoincrement':column['COLUMN_DEF'] is None
-        })    
+        })
     return sa_columns
-    
+
   @reflection.cache
   def get_primary_keys(self, connection, table_name, schema=None, **kw):
     if schema is None:
-        schema = self._get_default_schema_name(connection)
-        
+      schema = self._get_default_schema_name(connection)
+    else:
+      connection.connection.set_current_schema(schema)
+
     pkeys = connection.connection.primary_keys(True, schema, table_name)
-    return [key['COLUMN_NAME'] for key in pkeys]      
-    
+    return [key['COLUMN_NAME'] for key in pkeys]
+
   @reflection.cache
   def get_foreign_keys(self, connection, table_name, schema=None, **kw):
     if schema is None:
-        schema = self._get_default_schema_name(connection)
-    
+      schema = self._get_default_schema_name(connection)
+    else:
+      connection.connection.set_current_schema(schema)
+
     fkeys = []
     fschema = {}
     fkeys_info = connection.connection.foreign_keys(True, schema, table_name)
@@ -210,31 +213,30 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
               'referred_columns' : [key['PKCOLUMN_NAME']]}
       else:
         fschema[key['FK_NAME']]['constrained_columns'].append(key['FKCOLUMN_NAME'])
-        fschema[key['FK_NAME']]['referred_columns'].append(key['PKCOLUMN_NAME'])                                 
-    return [value for key, value in fschema.iteritems() ]           
+        fschema[key['FK_NAME']]['referred_columns'].append(key['PKCOLUMN_NAME'])
+    return [value for key, value in fschema.iteritems() ]
 
   # Retrieves a list of index names for a given schema
   @reflection.cache
   def get_indexes(self, connection, table_name, schema=None, **kw):
     if schema is None:
-        schema = self._get_default_schema_name(connection)
-    
+      schema = self._get_default_schema_name(connection)
+    else:
+      connection.connection.set_current_schema(schema)
+
     ndxnames = {}
-    ndxlst = connection.connection.indexes(False, schema, table_name)    
+    ndxlst = connection.connection.indexes(False, schema, table_name)
     for ndx in ndxlst:
       if not ndxnames.has_key(ndx['INDEX_NAME']):
         ndxnames[ndx['INDEX_NAME']] = {'name' : ndx['INDEX_NAME'],
               'column_names' : [ndx['COLUMN_NAME']],
-              'unique' : ndx['NON_UNIQUE'] == 0}               
-      else:             
+              'unique' : ndx['NON_UNIQUE'] == 0}
+      else:
         ndxnames[ndx['INDEX_NAME']]['column_names'].append(ndx['COLUMN_NAME'])
     return [value for key, value in ndxnames.iteritems() ]
 
   # Checks if the DB_API driver error indicates an invalid connection
   def is_disconnect(self, ex, connection, cursor):
-    """ Inputs: DB_API driver exception to be checked for invalid connection
-        Returns: True, if the exception indicates invalid connection, False otherwise.
-    """
     if isinstance(ex, (self.dbapi.ProgrammingError,
                        self.dbapi.OperationalError)):
         is_closed = 'Connection is not active' in str(ex) or \
