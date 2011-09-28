@@ -14,7 +14,7 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Jaimy Azle                                                      |
-# | Version:                                                                 |
+# | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 from decimal import Decimal as _python_Decimal
 from sqlalchemy import sql, util
@@ -208,7 +208,7 @@ class IBM_DB400ZxJDBCDialect(ZxJDBCConnector, ibm_base400.IBM_DB400Dialect):
         else:
           FilterDataHandler.setJDBCObject(self, statement, index, object, dbtype)
 
-    self.DataHandler = IBM_DB2DataHandler    
+    self.DataHandler = IBM_DB2DataHandler
 
   def _driver_kwargs(self):
     """return kw arg dict to be sent to connect()."""

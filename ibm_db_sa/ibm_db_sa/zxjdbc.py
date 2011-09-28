@@ -14,7 +14,7 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Jaimy Azle                                                      |
-# | Version:                                                                 |
+# | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 from decimal import Decimal as _python_Decimal
 from sqlalchemy import sql, util

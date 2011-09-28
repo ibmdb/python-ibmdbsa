@@ -14,8 +14,8 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Alex Pitigoi, Abhigyan Agrawal                                  |
-# | Updater: Jaimy Azle                                                      |
-# | Version:                                                                 |
+# | Contributor: Jaimy Azle                                                  |
+# | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 from ibm_db_sa import base, ibm_db, zxjdbc, pyodbc
 from ibm_db_sa import base400, zxjdbc400, pyodbc400

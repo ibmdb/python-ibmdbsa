@@ -14,8 +14,8 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Alex Pitigoi, Abhigyan Agrawal                                  |
-# | Updater: Jaimy Azle                                                      |
-# | Version:                                                                 |
+# | Contributor: Jaimy Azle                                                  |
+# | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 """Support for IBM DB2 database
 
@@ -105,15 +105,15 @@ RESERVED_WORDS = set(
     'real', 'var_samp', 'false', 'recursive', 'varchar', 'filter', 'ref', 'varying',
     'float', 'regr_avgx', 'width_bucket', 'floor', 'regr_avgy', 'window', 'fusion',
     'regr_count', 'within'])
-    
+
 class CoerceUnicode(TypeDecorator):
   impl = Unicode
 
   def process_bind_param(self, value, dialect):
       if isinstance(value, str):
           value = value.decode(dialect.encoding)
-      return value    
-    
+      return value
+
 ischema = MetaData()
 
 sys_schemas = Table("SCHEMATA", ischema,
@@ -141,18 +141,18 @@ sys_indexes = Table("INDEXES", ischema,
   Column("COLNAMES", CoerceUnicode, key="colnames"),
   Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
   schema="SYSCAT")
-  
+
 sys_foreignkeys = Table("SQLFOREIGNKEYS", ischema,
   Column("FK_NAME", CoerceUnicode, key="fkname"),
   Column("FKTABLE_SCHEM", CoerceUnicode, key="fktabschema"),
-  Column("FKTABLE_NAME", CoerceUnicode, key="fktabname"),     
+  Column("FKTABLE_NAME", CoerceUnicode, key="fktabname"),
   Column("FKCOLUMN_NAME", CoerceUnicode, key="fkcolname"),
   Column("PK_NAME", CoerceUnicode, key="pkname"),
   Column("PKTABLE_SCHEM", CoerceUnicode, key="pktabschema"),
-  Column("PKTABLE_NAME", CoerceUnicode, key="pktabname"), 
-  Column("PKCOLUMN_NAME", CoerceUnicode, key="pkcolname"),   
-  Column("KEY_SEQ", sa_types.Integer, key="colno"), 
-  schema="SYSIBM")  
+  Column("PKTABLE_NAME", CoerceUnicode, key="pktabname"),
+  Column("PKCOLUMN_NAME", CoerceUnicode, key="pkcolname"),
+  Column("KEY_SEQ", sa_types.Integer, key="colno"),
+  schema="SYSIBM")
 
 sys_columns = Table("COLUMNS", ischema,
   Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
@@ -164,7 +164,7 @@ sys_columns = Table("COLUMNS", ischema,
   Column("SCALE", sa_types.Integer, key="scale"),
   Column("DEFAULT", CoerceUnicode, key="defaultval"),
   Column("NULLS", CoerceUnicode, key="nullable"),
-  schema="SYSCAT")    
+  schema="SYSCAT")
 
 # Override module sqlalchemy.types
 class IBM_DBBinary(sa_types.Binary):
@@ -371,7 +371,7 @@ class IBM_DBBigInteger(sa_types.TypeEngine):
 class IBM_DBXML(sa_types.TypeEngine):
   def get_col_spec(self):
     return 'XML'
-    
+
 # Module level dictionary maps standard SQLAlchemy types to IBM_DB data types.
 # The dictionary uses the SQLAlchemy data types as key, and maps an IBM_DB type as its value
 colspecs = {
@@ -661,8 +661,8 @@ class IBM_DBDialect(default.DefaultDialect):
 
   def __init__(self, use_ansiquotes=None, **kwargs):
     super(IBM_DBDialect, self).__init__(**kwargs)
-    
-    
+
+
   def has_table(self, connection, table_name, schema=None):
     current_schema = schema or self.default_schema_name
     _query = sys_tables
@@ -673,8 +673,8 @@ class IBM_DBDialect(default.DefaultDialect):
         whereclause = _query.c.tabname==table_name
     s = sql.select([_query], whereclause)
     c = connection.execute(s)
-    return c.first() is not None  
-    
+    return c.first() is not None
+
   # Retrieves connection attributes values
   def _get_default_schema_name(self, connection):
     """Return: current setting of the schema attribute
@@ -682,7 +682,7 @@ class IBM_DBDialect(default.DefaultDialect):
     query = """SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1"""
     default_schema_name = connection.scalar(query)
     return unicode(default_schema_name)
-    
+
   @reflection.cache
   def get_schema_names(self, connection, **kw):
     sysschema = sys_schemas
@@ -692,7 +692,7 @@ class IBM_DBDialect(default.DefaultDialect):
     )
     schema_names = [r[0].lower() for r in connection.execute(query)]
     return schema_names
-    
+
   # Retrieves a list of table names for a given schema
   @reflection.cache
   def get_table_names(self, connection, schema = None, **kw):
@@ -704,12 +704,12 @@ class IBM_DBDialect(default.DefaultDialect):
       )
     table_names = [r[0].lower() for r in connection.execute(query)]
     return table_names
-    
+
   @reflection.cache
   def get_columns(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name    
+    current_schema = schema or self.default_schema_name
     syscols = sys_columns
-    
+
     query = sql.select([syscols.c.colname, syscols.c.typename,
                         syscols.c.defaultval, syscols.c.nullable,
                         syscols.c.length, syscols.c.scale],
@@ -721,26 +721,26 @@ class IBM_DBDialect(default.DefaultDialect):
         )
     sa_columns = []
     for r in connection.execute(query):
-      coltype = r[1].upper()      
+      coltype = r[1].upper()
       if coltype == 'DECIMAL':
         coltype = self.ischema_names.get(coltype)(int(r[4]), int(r[5]))
       elif coltype in ['CHAR', 'VARCHAR']:
-        coltype = self.ischema_names.get(coltype)(int(r[4]))        
+        coltype = self.ischema_names.get(coltype)(int(r[4]))
       else:
         try:
           coltype = self.ischema_names[coltype]
         except KeyError:
           util.warn("Did not recognize type '%s' of column '%s'" % (coltype, r[0]))
           coltype = coltype = sa_types.NULLTYPE
-          
+
       sa_columns.append({
           'name' : r[0],
           'type' : coltype,
           'nullable' : r[3] == 'Y',
           'default' : r[2],
           'autoincrement':r[2] is None
-        })     
-    return sa_columns                
+        })
+    return sa_columns
 
   @reflection.cache
   def get_primary_keys(self, connection, table_name, schema=None, **kw):
@@ -760,10 +760,10 @@ class IBM_DBDialect(default.DefaultDialect):
       cols = col_finder.findall(r[0])
       pk_columns.extend(cols)
     return pk_columns
-    
+
   @reflection.cache
   def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name    
+    current_schema = schema or self.default_schema_name
     sysfkeys = sys_foreignkeys
     query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
                         sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
@@ -787,8 +787,8 @@ class IBM_DBDialect(default.DefaultDialect):
       else:
         fschema[key['FK_NAME']]['constrained_columns'].append(r[3])
         fschema[key['FK_NAME']]['referred_columns'].append(r[7])
-    return [value for key, value in fschema.iteritems() ]     
-    
+    return [value for key, value in fschema.iteritems() ]
+
   # Retrieves a list of index names for a given schema
   @reflection.cache
   def get_indexes(self, connection, table_name, schema=None, **kw):
@@ -810,8 +810,8 @@ class IBM_DBDialect(default.DefaultDialect):
                     'column_names' : col_finder.findall(r[1]),
                     'unique': r[2] == 'U'
                 })
-    return indexes      
-   
+    return indexes
+
   # Returns the converted SA adapter type for a given generic vendor type provided
   @classmethod
   def type_descriptor(self, typeobj):

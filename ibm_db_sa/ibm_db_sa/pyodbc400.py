@@ -14,7 +14,7 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Jaimy Azle                                                      |
-# | Version:                                                                 |
+# | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 from decimal import Decimal as _python_Decimal
 from sqlalchemy import sql, util
@@ -73,6 +73,6 @@ class IBM_DB400PyODBCDialect(PyODBCConnector, ibm_base400.IBM_DB400Dialect):
 
   def __init__(self, use_ansiquotes=None, **kwargs):
     super(IBM_DB400PyODBCDialect, self).__init__(**kwargs)
-    self.paramstyle = IBM_DB400PyODBCDialect.dbapi().paramstyle   
+    self.paramstyle = IBM_DB400PyODBCDialect.dbapi().paramstyle
 
 dialect = IBM_DB400PyODBCDialect
