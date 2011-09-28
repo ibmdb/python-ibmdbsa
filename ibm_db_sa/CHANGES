@@ -17,3 +17,14 @@ Change Log
  - fixed Metadata not loading any table info (defect #158705)
  - fixed problems while using different schema names (defect #163785)
  - fixed keyerror in length in visit_function (defect #166292) 
+ 
+ 2011/08/28 (IBM_DB_SA adapter 0.2.0):
+ - Support of SQLAlchemy 0.6/0.7
+ - Add Jython support
+ 
+ 2011/09/27 (IBM_DB_SA adapter 0.2.1):
+ - fix reflection problem
+ - support alternate DB2 LUW connection via PyODBC
+ - support alternate DB2 i5/OS (iSeries) via PyODBC
+ - support alternate DB2 i5/OS (iSeries) via ZxJDBC (Jython)
+  

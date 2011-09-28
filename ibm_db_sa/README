@@ -1,13 +1,13 @@
 ===============================================================================
-IBM_DB_SA 0.1.6 (2008/11/06) implementing SQLAlchemy version 0.4.0
+IBM_DB_SA 0.2.1 (2008/11/06) implementing SQLAlchemy version 0.6/0.7
 ===============================================================================
 
 The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM
-Data Servers. The implementation conforms to SQLAlchemy-0.4.0 specification:
-  http://www.sqlalchemy.org/docs/04/index.html
+Data Servers. The implementation conforms to SQLAlchemy-0.6.0 specification:
+  http://www.sqlalchemy.org/docs/07/index.html
 
 The IBM_DB_SA adapter is packaged as a Python Egg component and is dependent on:
- - SQLAlchemy-0.4.0
+ - SQLAlchemy-0.6.0 and newer
  - IBM_DB_DBI Python wrapper (ibm_db_dbi)
  - IBM_DB Python driver (ibm_db)
  - IBM Data Server Driver for ODBC and CLI (db2cli) version 9
@@ -32,17 +32,17 @@ and follow up with these additional steps to install IBM_DB_SA:
   
   2. To install IBM_DB_SA egg component from the downloaded .egg file
     Windows:
-      > easy_install ibm_db_sa-0.1.0-py2.5.egg
+      > easy_install ibm_db_sa-0.2.1-py2.6.egg
     Linux/Unix:
-      $ sudo easy_install ibm_db_sa-0.1.0-py2.5.egg
+      $ sudo easy_install ibm_db_sa-0.2.1-py2.5.egg
   
   3. To uninstall IBM_DB_SA egg component:
     Windows:
-      > easy_install -m ibm_db_sa==0.1.0
-      > rmdir Python25\Lib\site-packages\ibm_db_sa-0.1.0-py2.5.egg
+      > easy_install -m ibm_db_sa==0.2.1
+      > rmdir Python25\Lib\site-packages\ibm_db_sa-0.2.1-py2.5.egg
     Linux/Unix:
-      $ sudo easy_install -m ibm_db_sa==0.1.0   
-      $ sudo rm -rf Python25\Lib\site-packages\ibm_db_sa-0.1.0-py2.5.egg
+      $ sudo easy_install -m ibm_db_sa==0.2.1   
+      $ sudo rm -rf Python25\Lib\site-packages\ibm_db_sa-0.2.1-py2.5.egg
 
 
 List of Operating Systems tested

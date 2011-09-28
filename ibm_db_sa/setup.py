@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 from distutils.core import setup
 
 PACKAGE = 'ibm_db_sa'
-VERSION = '0.1.6'
+VERSION = '0.2.1'
 LICENSE = 'Apache License 2.0'
 
 setup( name    = PACKAGE, 
@@ -22,20 +22,27 @@ setup( name    = PACKAGE,
                       'Operating System :: OS Independent',
                       'Topic :: Databases :: Front-end, middle-tier'],
        long_description = '''
-                      IBM_DB_SA implementats the SQLAlchemy version 0.4.0 specification
+                      IBM_DB_SA implementats the SQLAlchemy version 0.7.0 specification
                       in support of IBM Data Servers: DB2 8 and 9, Informix IDS 11''',
        platforms        = 'All',
-       install_requires = [ 'ibm_db>=0.4.0',
-                            'sqlalchemy>=0.4' ],
+       install_requires = [ 'ibm_db>=1.0.5',
+                            'sqlalchemy>=0.6.0'],
        dependency_links = [ 'http://pypi.python.org/pypi/ibm_db/',
                             'http://pypi.python.org/pypi/SQLAlchemy/'],
        packages     = find_packages(), 
        data_files   = [ ('', ['./README']),
                         ('', ['./CHANGES']),
-                        ('', ['./LICENSE']),
-                        ('ibm_db_sa', ['./ibm_db_sa/ibm_db_reserved']) ],
+                        ('', ['./LICENSE']) ],
        entry_points = {
-         'sqlalchemy.databases': ['ibm_db_sa = ibm_db_sa.ibm_db_sa:dialect',]
+         'sqlalchemy.dialects': ['ibm_db_sa = ibm_db_sa.base:dialect',
+                                 'ibm_db_sa.zxjdbc = ibm_db_sa.zxjdbc:dialect',
+                                 'ibm_db_sa.pyodbc = ibm_db_sa.pyodbc:dialect',
+                                 'ibm_db_sa.zxjdbc400 = ibm_db_sa.zxjdbc400:dialect',
+                                 'ibm_db_sa.pyodbc400 = ibm_db_sa.pyodbc400:dialect',
+                                 'ibm_db_sa_zxjdbc = ibm_db_sa.zxjdbc:dialect',
+                                 'ibm_db_sa_pyodbc = ibm_db_sa.pyodbc:dialect',
+                                 'ibm_db_sa_zxjdbc400 = ibm_db_sa.zxjdbc400:dialect',
+                                 'ibm_db_sa_pyodbc400 = ibm_db_sa.pyodbc400:dialect',]
        },
        include_package_data = True,
        zip_safe             = False,
