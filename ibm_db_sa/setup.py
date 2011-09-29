@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 
+from sys import platform
 from setuptools import setup, find_packages
 from distutils.core import setup
 
@@ -7,7 +8,8 @@ PACKAGE = 'ibm_db_sa'
 VERSION = '0.2.1'
 LICENSE = 'Apache License 2.0'
 
-setup( name    = PACKAGE, 
+IS_JYTHON = platform.startswith("java")
+setup( name    = PACKAGE,
        version = VERSION,
        license = LICENSE,
        description  = 'SQLAlchemy support for IBM Data Servers',
@@ -25,11 +27,9 @@ setup( name    = PACKAGE,
                       IBM_DB_SA implementats the SQLAlchemy version 0.7.0 specification
                       in support of IBM Data Servers: DB2 8 and 9, Informix IDS 11''',
        platforms        = 'All',
-       install_requires = [ 'ibm_db>=1.0.5',
-                            'sqlalchemy>=0.6.0'],
-       dependency_links = [ 'http://pypi.python.org/pypi/ibm_db/',
-                            'http://pypi.python.org/pypi/SQLAlchemy/'],
-       packages     = find_packages(), 
+       install_requires = ['sqlalchemy>=0.6.0'] if IS_JYTHON else ['ibm_db>=1.0.5', 'sqlalchemy>=0.6.0'],
+       dependency_links = ['http://pypi.python.org/pypi/SQLAlchemy/'] if IS_JYTHON else ['http://pypi.python.org/pypi/ibm_db/', 'http://pypi.python.org/pypi/SQLAlchemy/'],
+       packages     = find_packages(),
        data_files   = [ ('', ['./README']),
                         ('', ['./CHANGES']),
                         ('', ['./LICENSE']) ],
