@@ -109,7 +109,7 @@ class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
                       'database=%s' % database,
                       'dbalias=%s' % db_alias]
 
-        user = keys.pop("user", none)
+        user = keys.pop("user", None)
         if user:
           connectors.append("uid=%s" % user)
           connectors.append("pwd=%s" % keys.pop('password', ''))
