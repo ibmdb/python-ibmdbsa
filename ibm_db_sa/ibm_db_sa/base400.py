@@ -94,6 +94,12 @@ sys_foreignkeys = Table("SQLFOREIGNKEYS", ischema,
   Column("KEY_SEQ", sa_types.Integer, key="colno"),
   schema="SYSIBM")
 
+sys_views = Table("SYSVIEWS", ischema,
+  Column("TABLE_SCHEMA", ibm_base.CoerceUnicode, key="viewschema"),
+  Column("TABLE_NAME", ibm_base.CoerceUnicode, key="viewname"),
+  Column("VIEW_DEFINITION", ibm_base.CoerceUnicode, key="text"),
+  schema="QSYS2")
+
 class IBM_DB400Graphic(sa_types.String):
     """The SQL GRAPHIC type."""
 
@@ -181,24 +187,16 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
     super(IBM_DB400Dialect, self).__init__(**kwargs)
 
   def has_table(self, connection, table_name, schema=None):
-    current_schema = schema or self.default_schema_name
-    _query = sys_tables
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     if current_schema:
-        whereclause = sql.and_(_query.c.tabschema==current_schema,
-                               _query.c.tabname==table_name)
+        whereclause = sql.and_(sys_tables.c.tabschema==current_schema,
+                               sys_tables.c.tabname==table_name)
     else:
-        whereclause = _query.c.tabname==table_name
-    s = sql.select([_query], whereclause)
+        whereclause = sys_tables.c.tabname==table_name
+    s = sql.select([sys_tables], whereclause)
     c = connection.execute(s)
     return c.first() is not None
-
-  # Retrieves connection attributes values
-  def _get_default_schema_name(self, connection):
-    """Return: current setting of the schema attribute
-    """
-    query = """SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1"""
-    default_schema_name = connection.scalar(query)
-    return unicode(default_schema_name)
 
   @reflection.cache
   def get_schema_names(self, connection, **kw):
@@ -208,22 +206,44 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
         sql.not_(sysschema.c.schemaname.like('Q%')),
         order_by=[sysschema.c.schemaname]
     )
-    return [r[0].lower() for r in connection.execute(query)]
+    return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
   # Retrieves a list of table names for a given schema
   @reflection.cache
   def get_table_names(self, connection, schema = None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
     systbl = sys_tables
     query = sql.select([systbl.c.tabname],
         systbl.c.tabschema == current_schema,
         order_by=[systbl.c.tabname]
       )
-    return [r[0].lower() for r in connection.execute(query)]
+    return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+  @reflection.cache
+  def get_view_names(self, connection, schema=None, **kw):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+
+    query = sql.select([sys_views.c.viewname],
+        sys_views.c.viewschema == current_schema,
+        order_by=[sys_views.c.viewname]
+      )
+    return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+  @reflection.cache
+  def get_view_definition(self, connection, viewname, schema=None, **kw):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    viewname = self.denormalize_name(viewname)
+
+    query = sql.select([sys_views.c.text],
+        sys_views.c.viewschema == current_schema,
+        sys_views.c.viewname == viewname
+      )
+    return connection.execute(query).scalar()
 
   @reflection.cache
   def get_columns(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     syscols = sys_columns
 
     query = sql.select([syscols.c.colname, syscols.c.typename,
@@ -250,7 +270,7 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
           coltype = coltype = sa_types.NULLTYPE
 
       sa_columns.append({
-          'name' : r[0],
+          'name' : self.normalize_name(r[0]),
           'type' : coltype,
           'nullable' : r[3] == 'Y',
           'default' : r[2],
@@ -260,7 +280,8 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
 
   @reflection.cache
   def get_primary_keys(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     syscols = sys_columns
     sysconst = sys_table_constraints
     syskeyconst = sys_key_constraints
@@ -274,11 +295,12 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
           sysconst.c.contype == 'PRIMARY KEY'
       ), order_by = [syskeyconst.c.colno])
 
-    return [key[0] for key in connection.execute(query)]
+    return [self.normalize_name(key[0]) for key in connection.execute(query)]
 
   @reflection.cache
   def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     sysfkeys = sys_foreignkeys
     query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
                         sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
@@ -294,20 +316,21 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
     fschema = {}
     for r in connection.execute(query):
       if not fschema.has_key(r[0]):
-        fschema[key['FK_NAME']] = {'name' : r[0],
-              'constrained_columns' : [r[3]],
-              'referred_schema' : r[5],
-              'referred_table' : r[6],
-              'referred_columns' : [r[7]]}
+        fschema[key['FK_NAME']] = {'name' : self.normalize_name(r[0]),
+              'constrained_columns' : [self.normalize_name(r[3])],
+              'referred_schema' : self.normalize_name(r[5]),
+              'referred_table' : self.normalize_name(r[6]),
+              'referred_columns' : [self.normalize_name(r[7])]}
       else:
-        fschema[key['FK_NAME']]['constrained_columns'].append(r[3])
-        fschema[key['FK_NAME']]['referred_columns'].append(r[7])
+        fschema[key['FK_NAME']]['constrained_columns'].append(self.normalize_name(r[3]))
+        fschema[key['FK_NAME']]['referred_columns'].append(self.normalize_name(r[7]))
     return [value for key, value in fschema.iteritems() ]
 
   # Retrieves a list of index names for a given schema
   @reflection.cache
   def get_indexes(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     sysidx = sys_indexes
     syskey = sys_keys
 
@@ -322,11 +345,11 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
     for r in connection.execute(query):
       key = r[0].upper()
       if indexes.has_key(key):
-        indexes[key]['column_names'].append(r[2])
+        indexes[key]['column_names'].append(self.normalize_name(r[2]))
       else:
         indexes[key] = {
-                          'name' : r[0].upper(),
-                          'column_names' : [r[2]],
+                          'name' : self.normalize_name(r[0]),
+                          'column_names' : [self.normalize_name(r[2])],
                           'unique': r[1] == 'Y'
                       }
     return [value for key, value in indexes.iteritems()]

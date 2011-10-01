@@ -121,8 +121,7 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
                   driver connection handler
         Returns: representing the current schema.
     """
-    schema_name = connection.connection.get_current_schema()
-    return schema_name
+    return self.normalize_name(connection.connection.get_current_schema())
 
   # Verifies if a specific table exists for a given schema
   def has_table(self, connection, table_name, schema=None):
@@ -134,34 +133,31 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
                 - schema string, if not using the default schema
         Returns: True, if table exsits, False otherwise.
     """
-    if schema is None:
-        schema = self._get_default_schema_name(connection)
-    else:
-        connection.connection.set_current_schema(schema)
-    table = connection.connection.tables(schema, table_name)
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
+    connection.connection.set_current_schema(current_schema)
+
+    table = connection.connection.tables(current_schema, table_name)
     has_it = table is not None and \
              len(table) is not 0 \
-             and table[0]['TABLE_NAME'] == table_name.upper()
+             and table[0]['TABLE_NAME'] == table_name
     return has_it
 
   # Retrieves a list of table names for a given schema
   @reflection.cache
   def get_table_names(self, connection, schema = None, **kw):
-    if schema is None:
-      schema = self._get_default_schema_name(connection)
-    else:
-      connection.connection.set_current_schema(schema)
-    tables = connection.connection.tables(schema)
-    return [table['TABLE_NAME'].lower() for table in tables]
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    connection.connection.set_current_schema(current_schema)
+    tables = connection.connection.tables(current_schema)
+    return [self.normalize_name(table['TABLE_NAME']) for table in tables]
 
   @reflection.cache
   def get_columns(self, connection, table_name, schema=None, **kw):
-    if schema is None:
-      schema = self._get_default_schema_name(connection)
-    else:
-      connection.connection.set_current_schema(schema)
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
+    connection.connection.set_current_schema(current_schema)
 
-    columns = connection.connection.columns(schema, table_name)
+    columns = connection.connection.columns(current_schema, table_name)
     sa_columns = []
     for column in columns:
       coltype = column['TYPE_NAME'].upper()
@@ -176,7 +172,7 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
           util.warn("Did not recognize type '%s' of column '%s'" % (coltype, column['COLUMN_NAME']))
           coltype = sa_types.NULLTYPE
       sa_columns.append({
-          'name' : column['COLUMN_NAME'],
+          'name' : self.normalize_name(column['COLUMN_NAME']),
           'type' : coltype,
           'nullable' : column['NULLABLE'] == 1,
           'default' : column['COLUMN_DEF'],
@@ -186,53 +182,50 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
 
   @reflection.cache
   def get_primary_keys(self, connection, table_name, schema=None, **kw):
-    if schema is None:
-      schema = self._get_default_schema_name(connection)
-    else:
-      connection.connection.set_current_schema(schema)
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
+    connection.connection.set_current_schema(current_schema)
 
-    pkeys = connection.connection.primary_keys(True, schema, table_name)
-    return [key['COLUMN_NAME'] for key in pkeys]
+    pkeys = connection.connection.primary_keys(True, current_schema, table_name)
+    return [self.normalize_name(key['COLUMN_NAME']) for key in pkeys]
 
   @reflection.cache
   def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-    if schema is None:
-      schema = self._get_default_schema_name(connection)
-    else:
-      connection.connection.set_current_schema(schema)
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
+    connection.connection.set_current_schema(current_schema)
 
     fkeys = []
     fschema = {}
-    fkeys_info = connection.connection.foreign_keys(True, schema, table_name)
+    fkeys_info = connection.connection.foreign_keys(True, current_schema, table_name)
     for key in fkeys_info:
       if not fschema.has_key(key['FK_NAME']):
         fschema[key['FK_NAME']] = {'name' : key['FK_NAME'],
-              'constrained_columns' : [key['FKCOLUMN_NAME']],
-              'referred_schema' : key['PKTABLE_SCHEM'],
-              'referred_table' : key['PKTABLE_NAME'],
-              'referred_columns' : [key['PKCOLUMN_NAME']]}
+              'constrained_columns' : [self.normalize_name(key['FKCOLUMN_NAME'])],
+              'referred_schema' : self.normalize_name(key['PKTABLE_SCHEM']),
+              'referred_table' : self.normalize_name(key['PKTABLE_NAME']),
+              'referred_columns' : [self.normalize_name(key['PKCOLUMN_NAME'])]}
       else:
-        fschema[key['FK_NAME']]['constrained_columns'].append(key['FKCOLUMN_NAME'])
-        fschema[key['FK_NAME']]['referred_columns'].append(key['PKCOLUMN_NAME'])
+        fschema[key['FK_NAME']]['constrained_columns'].append(self.normalize_name(key['FKCOLUMN_NAME']))
+        fschema[key['FK_NAME']]['referred_columns'].append(self.normalize_name(key['PKCOLUMN_NAME']))
     return [value for key, value in fschema.iteritems() ]
 
   # Retrieves a list of index names for a given schema
   @reflection.cache
   def get_indexes(self, connection, table_name, schema=None, **kw):
-    if schema is None:
-      schema = self._get_default_schema_name(connection)
-    else:
-      connection.connection.set_current_schema(schema)
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
+    connection.connection.set_current_schema(current_schema)
 
     ndxnames = {}
-    ndxlst = connection.connection.indexes(False, schema, table_name)
+    ndxlst = connection.connection.indexes(False, current_schema, table_name)
     for ndx in ndxlst:
       if not ndxnames.has_key(ndx['INDEX_NAME']):
-        ndxnames[ndx['INDEX_NAME']] = {'name' : ndx['INDEX_NAME'],
-              'column_names' : [ndx['COLUMN_NAME']],
+        ndxnames[ndx['INDEX_NAME']] = {'name' : self.normalize_name(ndx['INDEX_NAME']),
+              'column_names' : [self.normalize_name(ndx['COLUMN_NAME'])],
               'unique' : ndx['NON_UNIQUE'] == 0}
       else:
-        ndxnames[ndx['INDEX_NAME']]['column_names'].append(ndx['COLUMN_NAME'])
+        ndxnames[ndx['INDEX_NAME']]['column_names'].append(self.normalize_name(ndx['COLUMN_NAME']))
     return [value for key, value in ndxnames.iteritems() ]
 
   # Checks if the DB_API driver error indicates an invalid connection

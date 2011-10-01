@@ -166,6 +166,12 @@ sys_columns = Table("COLUMNS", ischema,
   Column("NULLS", CoerceUnicode, key="nullable"),
   schema="SYSCAT")
 
+sys_views = Table("VIEWS", ischema,
+  Column("VIEWSCHEMA", CoerceUnicode, key="viewschema"),
+  Column("VIEWNAME", CoerceUnicode, key="viewname"),
+  Column("TEXT", CoerceUnicode, key="text"),
+  schema="SYSCAT")
+
 # Override module sqlalchemy.types
 class IBM_DBBinary(sa_types.Binary):
   def get_col_spec(self):
@@ -623,13 +629,16 @@ class IBM_DBDDLCompiler(compiler.DDLCompiler):
 class IBM_DBIdentifierPreparer(compiler.IdentifierPreparer):
 
   reserved_words = RESERVED_WORDS
+  illegal_initial_characters = set(xrange(0, 10)).union(["_", "$"])
 
   def __init__(self, dialect, **kw):
     super(IBM_DBIdentifierPreparer, self).__init__(dialect, initial_quote="'")
 
-  # Override the identifier quoting default implementation.
-  def _requires_quotes(self, value):
-    return False
+  def _bindparam_requires_quotes(self, value):
+    return (value.lower() in self.reserved_words
+            or value[0] in self.illegal_initial_characters
+            or not self.legal_characters.match(unicode(value))
+            )
 
 
 class IBM_DBExecutionContext(default.DefaultExecutionContext):
@@ -662,26 +671,44 @@ class IBM_DBDialect(default.DefaultDialect):
   def __init__(self, use_ansiquotes=None, **kwargs):
     super(IBM_DBDialect, self).__init__(**kwargs)
 
+  def normalize_name(self, name):
+    if isinstance(name, str):
+      name = name.decode(self.encoding)
+    elif name != None:
+      return name.lower() if name.upper() == name and \
+        not self.identifier_preparer._requires_quotes(name.lower()) else \
+        name
+    return None
 
-  def has_table(self, connection, table_name, schema=None):
-    current_schema = schema or self.default_schema_name
-    _query = sys_tables
-    if current_schema:
-        whereclause = sql.and_(_query.c.tabschema==current_schema,
-                               _query.c.tabname==table_name)
+  def denormalize_name(self, name):
+    if name is None:
+      return None
+    elif name.lower() == name and not self.identifier_preparer._requires_quotes(name.lower()):
+      name = name.upper()
+    if not self.supports_unicode_binds:
+      name = name.encode(self.encoding)
     else:
-        whereclause = _query.c.tabname==table_name
-    s = sql.select([_query], whereclause)
-    c = connection.execute(s)
-    return c.first() is not None
+      name = unicode(name)
+    return name
 
   # Retrieves connection attributes values
   def _get_default_schema_name(self, connection):
     """Return: current setting of the schema attribute
     """
-    query = """SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1"""
-    default_schema_name = connection.scalar(query)
-    return unicode(default_schema_name)
+    return self.normalize_name(connection.execute(u'SELECT CURRENT_SCHEMA ' \
+      'FROM SYSIBM.SYSDUMMY1').scalar())
+
+  def has_table(self, connection, table_name, schema=None):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
+    if current_schema:
+        whereclause = sql.and_(sys_tables.c.tabschema==current_schema,
+                               sys_tables.c.tabname==table_name)
+    else:
+        whereclause = sys_tables.c.tabname==table_name
+    s = sql.select([sys_tables], whereclause)
+    c = connection.execute(s)
+    return c.first() is not None
 
   @reflection.cache
   def get_schema_names(self, connection, **kw):
@@ -690,24 +717,44 @@ class IBM_DBDialect(default.DefaultDialect):
         sql.not_(sysschema.c.schemaname.like('SYS%')),
         order_by=[sysschema.c.schemaname]
     )
-    schema_names = [r[0].lower() for r in connection.execute(query)]
-    return schema_names
+    return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
   # Retrieves a list of table names for a given schema
   @reflection.cache
   def get_table_names(self, connection, schema = None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
     systbl = sys_tables
     query = sql.select([systbl.c.tabname],
         systbl.c.tabschema == current_schema,
         order_by=[systbl.c.tabname]
       )
-    table_names = [r[0].lower() for r in connection.execute(query)]
-    return table_names
+    return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+  @reflection.cache
+  def get_view_names(self, connection, schema=None, **kw):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+
+    query = sql.select([sys_views.c.viewname],
+        sys_views.c.viewschema == current_schema,
+        order_by=[sys_views.c.viewname]
+      )
+    return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+  @reflection.cache
+  def get_view_definition(self, connection, viewname, schema=None, **kw):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    viewname = self.denormalize_name(viewname)
+
+    query = sql.select([sys_views.c.text],
+        sys_views.c.viewschema == current_schema,
+        sys_views.c.viewname == viewname
+      )
+    return connection.execute(query).scalar()
 
   @reflection.cache
   def get_columns(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     syscols = sys_columns
 
     query = sql.select([syscols.c.colname, syscols.c.typename,
@@ -715,7 +762,7 @@ class IBM_DBDialect(default.DefaultDialect):
                         syscols.c.length, syscols.c.scale],
           sql.and_(
               syscols.c.tabschema == current_schema,
-              syscols.c.tabname == table_name.upper()
+              syscols.c.tabname == table_name
             ),
           order_by=[syscols.c.tabschema, syscols.c.tabname, syscols.c.colname, syscols.c.colno]
         )
@@ -734,7 +781,7 @@ class IBM_DBDialect(default.DefaultDialect):
           coltype = coltype = sa_types.NULLTYPE
 
       sa_columns.append({
-          'name' : r[0],
+          'name' : self.normalize_name(r[0]),
           'type' : coltype,
           'nullable' : r[3] == 'Y',
           'default' : r[2],
@@ -744,7 +791,8 @@ class IBM_DBDialect(default.DefaultDialect):
 
   @reflection.cache
   def get_primary_keys(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     sysindexes = sys_indexes
     col_finder = re.compile("(\w+)")
     query = sql.select([sysindexes.c.colnames],
@@ -759,11 +807,12 @@ class IBM_DBDialect(default.DefaultDialect):
     for r in connection.execute(query):
       cols = col_finder.findall(r[0])
       pk_columns.extend(cols)
-    return pk_columns
+    return [self.normalize_name(col) for col in pk_columns]
 
   @reflection.cache
   def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     sysfkeys = sys_foreignkeys
     query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
                         sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
@@ -779,20 +828,21 @@ class IBM_DBDialect(default.DefaultDialect):
     fschema = {}
     for r in connection.execute(query):
       if not fschema.has_key(r[0]):
-        fschema[key['FK_NAME']] = {'name' : r[0],
-              'constrained_columns' : [r[3]],
-              'referred_schema' : r[5],
-              'referred_table' : r[6],
-              'referred_columns' : [r[7]]}
+        fschema[key['FK_NAME']] = {'name' : self.normalize_name(r[0]),
+              'constrained_columns' : [self.normalize_name(r[3])],
+              'referred_schema' : self.normalize_name(r[5]),
+              'referred_table' : self.normalize_name(r[6]),
+              'referred_columns' : [self.normalize_name(r[7])]}
       else:
-        fschema[key['FK_NAME']]['constrained_columns'].append(r[3])
-        fschema[key['FK_NAME']]['referred_columns'].append(r[7])
+        fschema[key['FK_NAME']]['constrained_columns'].append(self.normalize_name(r[3]))
+        fschema[key['FK_NAME']]['referred_columns'].append(self.normalize_name(r[7]))
     return [value for key, value in fschema.iteritems() ]
 
   # Retrieves a list of index names for a given schema
   @reflection.cache
   def get_indexes(self, connection, table_name, schema=None, **kw):
-    current_schema = schema or self.default_schema_name
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    table_name = self.denormalize_name(table_name)
     sysidx = sys_indexes
     query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule],
         sql.and_(
@@ -806,8 +856,8 @@ class IBM_DBDialect(default.DefaultDialect):
     for r in connection.execute(query):
       if r[2] != 'P':
         indexes.append({
-                    'name' : r[0].lower(),
-                    'column_names' : col_finder.findall(r[1]),
+                    'name' : self.normalize_name(r[0]),
+                    'column_names' : [self.normalize_name(col) for col in col_finder.findall(r[1])],
                     'unique': r[2] == 'U'
                 })
     return indexes
