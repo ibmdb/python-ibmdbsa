@@ -1,0 +1,6 @@
+# any kind of "*" pulls in __init__.pyc files,
+# so all extensions are explicit.
+
+include README* LICENSE CHANGES*
+
+prune test
