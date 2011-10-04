@@ -161,9 +161,9 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
     sa_columns = []
     for column in columns:
       coltype = column['TYPE_NAME'].upper()
-      if coltype == 'DECIMAL':
+      if coltype in ['DECIMAL', 'NUMERIC']:
         coltype = self.ischema_names.get(coltype)(column['COLUMN_SIZE'], column['DECIMAL_DIGITS'])
-      elif coltype in ['CHAR', 'VARCHAR']:
+      elif coltype in ['CHARACTER', 'CHAR', 'VARCHAR', 'GRAPHIC', 'VARGRAPHIC']:
         coltype = self.ischema_names.get(coltype)(column['COLUMN_SIZE'])
       else:
         try:

@@ -58,7 +58,12 @@ class IBM_DBPyODBCNumeric(sa_types.Numeric):
 
 class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
 
-  supports_unicode_statements = False
+  supports_unicode_statements   = False
+  supports_sane_rowcount        = True
+  supports_sane_multi_rowcount  = True
+  supports_native_decimal       = True
+  supports_char_length          = True
+  supports_native_decimal       = False
 
   pyodbc_driver_name = "IBM DB2 ODBC DRIVER"
   colspecs = util.update_copy(
@@ -70,6 +75,7 @@ class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
   )
 
   def __init__(self, use_ansiquotes=None, **kwargs):
+    kwargs.setdefault('convert_unicode', True)
     super(IBM_DBPyODBCDialect, self).__init__(**kwargs)
     self.paramstyle = IBM_DBPyODBCDialect.dbapi().paramstyle
 

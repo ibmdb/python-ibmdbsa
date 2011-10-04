@@ -100,88 +100,7 @@ sys_views = Table("SYSVIEWS", ischema,
   Column("VIEW_DEFINITION", ibm_base.CoerceUnicode, key="text"),
   schema="QSYS2")
 
-class IBM_DB400Graphic(sa_types.String):
-    """The SQL GRAPHIC type."""
-
-    __visit_name__ = 'GRAPHIC'
-
-    def get_dbapi_type(self, dbapi):
-        return dbapi.VARCHAR
-
-class IBM_DB400VarG(sa_types.String):
-    """The SQL VARG type."""
-
-    __visit_name__ = 'VARG'
-
-    def get_dbapi_type(self, dbapi):
-        return dbapi.VARCHAR
-
-class IBM_DB400Numeric(sa_types.String):
-    """The SQL NUMERIC type."""
-
-    __visit_name__ = 'NUMERIC'
-
-class IBM_DB400Timestamp(sa_types.String):
-    """The SQL TIMESTMP type."""
-
-    __visit_name__ = 'TIMESTMP'
-
-
-class IBM_DB400DBCLOB(sa_types.CLOB):
-    """The DBCLOB type.
-
-    This type is found in Oracle and Informix.
-    """
-
-    __visit_name__ = 'DBCLOB'
-
-
-class IBM_DB400TypeCompiler(ibm_base.IBM_DBTypeCompiler):
-
-  def visit_GRAPHIC(self, type_):
-    return "GRAPHIC"
-
-  def visit_VARG(self, type_):
-    return "VARG"
-
-  def visit_TIMESTAMP(self, type_):
-    return "TIMESTMP"
-
-  def visit_NUMERIC(self, type_):
-    if not type_.precision:
-      return "NUMERIC(31, 0)"
-    elif not type_.scale:
-      return "NUMERIC(%(precision)s, 0)" % {'precision': type_.precision}
-    else:
-      return "NUMERIC(%(precision)s, %(scale)s)" % {'precision': type_.precision, 'scale': type_.scale}
-
-  def visit_DBCLOB(self, type_):
-    return "DBCLOB(1M)" if type_.length in (None, 0) else \
-        "DBCLOB(%(length)s)" % {'length' : type_.length}
-
 class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
-
-  supports_unicode_statements = supports_unicode_binds = \
-    returns_unicode_strings = supports_unicode = False
-
-  colspecs = util.update_copy(
-      ibm_base.IBM_DBDialect.colspecs,
-      {
-        sa_types.TIMESTAMP : IBM_DB400Timestamp,
-        sa_types.NUMERIC : IBM_DB400Numeric,
-      }
-  )
-
-  ischema_names = util.update_copy(
-      ibm_base.IBM_DBDialect.ischema_names,
-      {
-        'GRAPHIC' : IBM_DB400Graphic,
-        'NUMERIC' : IBM_DB400Numeric,
-        'VARG':     IBM_DB400VarG,
-        'TIMESTMP': IBM_DB400Timestamp,
-        'DBCLOB':   IBM_DB400DBCLOB
-      }
-  )
 
   def __init__(self, use_ansiquotes=None, **kwargs):
     super(IBM_DB400Dialect, self).__init__(**kwargs)
@@ -260,7 +179,7 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
       coltype = r[1].upper()
       if coltype in ['DECIMAL', 'NUMERIC']:
         coltype = self.ischema_names.get(coltype)(int(r[4]), int(r[5]))
-      elif coltype in ['CHAR', 'VARCHAR']:
+      elif coltype in ['CHARACTER', 'CHAR', 'VARCHAR', 'GRAPHIC', 'VARGRAPHIC']:
         coltype = self.ischema_names.get(coltype)(int(r[4]))
       else:
         try:
@@ -316,14 +235,14 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
     fschema = {}
     for r in connection.execute(query):
       if not fschema.has_key(r[0]):
-        fschema[key['FK_NAME']] = {'name' : self.normalize_name(r[0]),
+        fschema[r[0]] = {'name' : self.normalize_name(r[0]),
               'constrained_columns' : [self.normalize_name(r[3])],
               'referred_schema' : self.normalize_name(r[5]),
               'referred_table' : self.normalize_name(r[6]),
               'referred_columns' : [self.normalize_name(r[7])]}
       else:
-        fschema[key['FK_NAME']]['constrained_columns'].append(self.normalize_name(r[3]))
-        fschema[key['FK_NAME']]['referred_columns'].append(self.normalize_name(r[7]))
+        fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
+        fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
     return [value for key, value in fschema.iteritems() ]
 
   # Retrieves a list of index names for a given schema

@@ -32,7 +32,7 @@ from sqlalchemy.types import TypeDecorator, Unicode
 
 from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
-from sqlalchemy import sql
+from sqlalchemy import sql, util
 
 # as documented from:
 # http://publib.boulder.ibm.com/infocenter/db2luw/v9/index.jsp?topic=/com.ibm.db2.udb.doc/admin/r0001095.htm
@@ -173,7 +173,7 @@ sys_views = Table("VIEWS", ischema,
   schema="SYSCAT")
 
 # Override module sqlalchemy.types
-class IBM_DBBinary(sa_types.Binary):
+class IBM_DBBinary(sa_types.LargeBinary):
   def get_col_spec(self):
     if self.length is None:
       return "BLOB(1M)"
@@ -324,11 +324,15 @@ class IBM_DBTEXT(sa_types.TEXT):
       return 'VARCHAR(%s)' % self.length
 
 class IBM_DBDecimal(sa_types.DECIMAL):
+
   def get_col_spec(self):
     if not self.precision:
-      return 'DECIMAL(31,0)'
+      return "DECIMAL(31,0)"
     else:
-      return 'DECIMAL(%(precision)s, %(length)s)' % {'precision': self.precision, 'length' : self.length}
+      if __sa_version__ > 0.5:
+        return "DECIMAL(%(precision)s, %(length)s)" % {'precision': self.precision, 'length' : self.scale}
+      else:
+        return "DECIMAL(%(precision)s, %(length)s)" % {'precision': self.precision, 'length' : self.length}
 
 class IBM_DBINT(sa_types.INT):
   def get_col_spec(self):
@@ -337,6 +341,10 @@ class IBM_DBINT(sa_types.INT):
 class IBM_DBCLOB(sa_types.CLOB):
   def get_col_spec(self):
     return 'CLOB'
+
+class IBM_DBDBCLOB(sa_types.CLOB):
+  def get_col_spec(self):
+    return 'DBCLOB'
 
 class IBM_DBVARCHAR(sa_types.VARCHAR):
   def get_col_spec(self):
@@ -351,6 +359,20 @@ class IBM_DBChar(sa_types.CHAR):
       return 'CHAR'
     else:
       return 'CHAR(%s)' % self.length
+
+class IBM_DBGRAPHIC(sa_types.CHAR):
+  def get_col_spec(self):
+    if self.length is None:
+      return 'GRAPHIC'
+    else:
+      return 'GRAPHIC(%s)' % self.length
+
+class IBM_DBVARGRAPHIC(sa_types.UnicodeText):
+  def get_col_spec(self):
+    if self.length is None:
+      return 'LONG VARGRAPHIC'
+    else:
+      return 'VARGRAPHIC(%s)' % self.length
 
 class IBM_DBBLOB(sa_types.BLOB):
   def get_col_spec(self):
@@ -374,14 +396,14 @@ class IBM_DBBigInteger(sa_types.TypeEngine):
   def get_col_spec(self):
     return 'BIGINT'
 
-class IBM_DBXML(sa_types.TypeEngine):
+class IBM_DBXML(sa_types.Text):
   def get_col_spec(self):
     return 'XML'
 
 # Module level dictionary maps standard SQLAlchemy types to IBM_DB data types.
 # The dictionary uses the SQLAlchemy data types as key, and maps an IBM_DB type as its value
 colspecs = {
-    sa_types.Binary       : IBM_DBBinary,
+    sa_types.LargeBinary  : IBM_DBBinary,
     sa_types.String       : IBM_DBString,
     sa_types.Boolean      : IBM_DBBoolean,
     sa_types.Integer      : IBM_DBInteger,
@@ -401,7 +423,8 @@ colspecs = {
     sa_types.VARCHAR      : IBM_DBVARCHAR,
     sa_types.CHAR         : IBM_DBChar,
     sa_types.BLOB         : IBM_DBBLOB,
-    sa_types.BOOLEAN      : IBM_DBBOOLEAN
+    sa_types.BOOLEAN      : IBM_DBBOOLEAN,
+    sa_types.Unicode      : IBM_DBVARGRAPHIC
 }
 
 # Module level dictionary which maps the data type name returned by a database
@@ -411,6 +434,7 @@ colspecs = {
 ischema_names = {
     'BLOB'         : IBM_DBBinary,
     'CHAR'         : IBM_DBChar,
+    'CHARACTER'    : IBM_DBChar,
     'CLOB'         : IBM_DBCLOB,
     'DATE'         : IBM_DBDate,
     'DATETIME'     : IBM_DBDateTime,
@@ -418,16 +442,24 @@ ischema_names = {
     'SMALLINT'     : IBM_DBSmallInteger,
     'BIGINT'       : IBM_DBBigInteger,
     'DECIMAL'      : IBM_DBDecimal,
+    'NUMERIC'      : IBM_DBNumeric,
     'REAL'         : IBM_DBFloat,
     'DOUBLE'       : IBM_DBDouble,
     'TIME'         : IBM_DBTime,
     'TIMESTAMP'    : IBM_DBTimeStamp,
     'VARCHAR'      : IBM_DBString,
     'LONG VARCHAR' : IBM_DBTEXT,
-    'XML'          : IBM_DBXML
+    'XML'          : IBM_DBXML,
+    'GRAPHIC'      : IBM_DBGRAPHIC,
+    'VARGRAPHIC'   : IBM_DBVARGRAPHIC,
+    'LONG VARGRAPHIC': IBM_DBVARGRAPHIC,
+    'DBCLOB'       : IBM_DBDBCLOB
 }
 
 class IBM_DBTypeCompiler(compiler.GenericTypeCompiler):
+
+  def visit_now_func(self, fn, **kw):
+    return "CURRENT_TIMESTAMP"
 
   def visit_TIMESTAMP(self, type_):
     return "TIMESTAMP"
@@ -463,6 +495,10 @@ class IBM_DBTypeCompiler(compiler.GenericTypeCompiler):
     return "BLOB(1M)" if type_.length in (None, 0) else \
         "BLOB(%(length)s)" % {'length' : type_.length}
 
+  def visit_DBCLOB(self, type_):
+    return "DBCLOB(1M)" if type_.length in (None, 0) else \
+        "DBCLOB(%(length)s)" % {'length' : type_.length}
+
   def visit_VARCHAR(self, type_):
     if self.dialect.supports_char_length:
       return "LONG VARCHAR" if type_.length in (None, 0) else \
@@ -470,9 +506,20 @@ class IBM_DBTypeCompiler(compiler.GenericTypeCompiler):
     else:
       return "LONG VARCHAR"
 
+  def visit_VARGRAPHIC(self, type_):
+    if self.dialect.supports_char_length:
+      return "LONG VARGRAPHIC" if type_.length in (None, 0) else \
+        "VARGRAPHIC(%(length)s)" % {'length' : type_.length}
+    else:
+      return "LONG VARGRAPHIC"
+
   def visit_CHAR(self, type_):
     return "CHAR" if type_.length in (None, 0) else \
         "CHAR(%(length)s)" % {'length' : type_.length}
+
+  def visit_GRAPHIC(self, type_):
+    return "GRAPHIC" if type_.length in (None, 0) else \
+        "GRAPHIC(%(length)s)" % {'length' : type_.length}
 
   def visit_DECIMAL(self, type_):
     if not type_.precision:
@@ -495,13 +542,20 @@ class IBM_DBTypeCompiler(compiler.GenericTypeCompiler):
     return self.visit_FLOAT(type_)
 
   def visit_unicode(self, type_):
-    return self.visit_VARCHAR(type_)
+    return self.visit_VARGRAPHIC(type_)
+
+  def visit_unicode_text(self, type_):
+    return self.visit_VARGRAPHIC(type_)
 
   def visit_TEXT(self, type_):
     return self.visit_VARCHAR(type_)
 
   def visit_boolean(self, type_):
     return self.visit_SMALLINT(type_)
+
+  def visit_large_binary(self, type_):
+    return self.visit_BLOB(type_)
+
 
 class IBM_DBCompiler(compiler.SQLCompiler):
 
@@ -603,10 +657,12 @@ class IBM_DBDDLCompiler(compiler.DDLCompiler):
 
   def visit_drop_index(self, drop):
     index = drop.element
-
-    return "\nDROP INDEX %s ON %s" % \
-                (self.preparer.quote(self._validate_identifier(index.name, False), index.quote),
-                 self.preparer.format_table(index.table))
+    return "\nDROP INDEX %s.%s" % (
+            self.preparer.quote_identifier(drop.element.table.name),
+            self.preparer.quote(
+                        self._index_identifier(drop.element.name),
+                        drop.element.quote)
+            )
 
   def visit_drop_constraint(self, drop):
     constraint = drop.element
@@ -632,7 +688,8 @@ class IBM_DBIdentifierPreparer(compiler.IdentifierPreparer):
   illegal_initial_characters = set(xrange(0, 10)).union(["_", "$"])
 
   def __init__(self, dialect, **kw):
-    super(IBM_DBIdentifierPreparer, self).__init__(dialect, initial_quote="'")
+    super(IBM_DBIdentifierPreparer, self).__init__(dialect, initial_quote='"', \
+      final_quote='"')
 
   def _bindparam_requires_quotes(self, value):
     return (value.lower() in self.reserved_words
@@ -646,6 +703,14 @@ class IBM_DBExecutionContext(default.DefaultExecutionContext):
         return self._execute_scalar("SELECT NEXTVAL FOR" +
                     self.dialect.identifier_preparer.format_sequence(seq) +
                     " FROM SYSIBM.SYSDUMMY1", type_)
+
+    def get_lastrowid(self):
+      cursor = self.create_cursor()
+      cursor.execute("SELECT IDENTITY_VAL_LOCAL() "+
+          "FROM SYSIBM.SYSDUMMY1")
+      lastrowid = cursor.fetchone()[0]
+      cursor.close()
+      return lastrowid
 
 class IBM_DBDialect(default.DefaultDialect):
   """Details of the IBM_DB dialect.  Not used directly in application code."""
@@ -661,6 +726,8 @@ class IBM_DBDialect(default.DefaultDialect):
   colspecs                      = colspecs
   ischema_names                 = ischema_names
   supports_char_length          = False
+  supports_unicode_statements = supports_unicode_binds = False
+  returns_unicode_strings = supports_unicode = True
 
   statement_compiler            = IBM_DBCompiler
   ddl_compiler                  = IBM_DBDDLCompiler
@@ -676,9 +743,8 @@ class IBM_DBDialect(default.DefaultDialect):
       name = name.decode(self.encoding)
     elif name != None:
       return name.lower() if name.upper() == name and \
-        not self.identifier_preparer._requires_quotes(name.lower()) else \
-        name
-    return None
+        not self.identifier_preparer._requires_quotes(name.lower()) else name
+    return name
 
   def denormalize_name(self, name):
     if name is None:
@@ -695,8 +761,10 @@ class IBM_DBDialect(default.DefaultDialect):
   def _get_default_schema_name(self, connection):
     """Return: current setting of the schema attribute
     """
-    return self.normalize_name(connection.execute(u'SELECT CURRENT_SCHEMA ' \
-      'FROM SYSIBM.SYSDUMMY1').scalar())
+    default_schema_name = connection.execute(u'SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1;').scalar()
+    if isinstance(default_schema_name, str):
+      default_schema_name = default_schema_name.strip()
+    return self.normalize_name(default_schema_name)
 
   def has_table(self, connection, table_name, schema=None):
     current_schema = self.denormalize_name(schema or self.default_schema_name)
@@ -769,9 +837,9 @@ class IBM_DBDialect(default.DefaultDialect):
     sa_columns = []
     for r in connection.execute(query):
       coltype = r[1].upper()
-      if coltype == 'DECIMAL':
+      if coltype in ['DECIMAL', 'NUMERIC']:
         coltype = self.ischema_names.get(coltype)(int(r[4]), int(r[5]))
-      elif coltype in ['CHAR', 'VARCHAR']:
+      elif coltype in ['CHARACTER', 'CHAR', 'VARCHAR', 'GRAPHIC', 'VARGRAPHIC']:
         coltype = self.ischema_names.get(coltype)(int(r[4]))
       else:
         try:
@@ -828,15 +896,16 @@ class IBM_DBDialect(default.DefaultDialect):
     fschema = {}
     for r in connection.execute(query):
       if not fschema.has_key(r[0]):
-        fschema[key['FK_NAME']] = {'name' : self.normalize_name(r[0]),
+        fschema[r[0]] = {'name' : self.normalize_name(r[0]),
               'constrained_columns' : [self.normalize_name(r[3])],
               'referred_schema' : self.normalize_name(r[5]),
               'referred_table' : self.normalize_name(r[6]),
               'referred_columns' : [self.normalize_name(r[7])]}
       else:
-        fschema[key['FK_NAME']]['constrained_columns'].append(self.normalize_name(r[3]))
-        fschema[key['FK_NAME']]['referred_columns'].append(self.normalize_name(r[7]))
+        fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
+        fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
     return [value for key, value in fschema.iteritems() ]
+
 
   # Retrieves a list of index names for a given schema
   @reflection.cache
@@ -878,6 +947,12 @@ class IBM_DBDialect(default.DefaultDialect):
 
   def _compat_first(self, rp, charset=None):
     return _DecodingRowProxy(rp.first(), charset)
+
+  def do_executemany(self, cursor, statement, parameters, context=None):
+    cursor.executemany(statement, parameters)
+
+  def do_execute(self, cursor, statement, parameters, context=None):
+    cursor.execute(statement, parameters)
 
 log.class_logger(IBM_DBDialect)
 
