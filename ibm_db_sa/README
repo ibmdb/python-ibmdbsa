@@ -32,7 +32,7 @@ and follow up with these additional steps to install IBM_DB_SA:
   
   2. To install IBM_DB_SA egg component from the downloaded .egg file
     Windows:
-      > easy_install ibm_db_sa-0.2.1-py2.6.egg
+      > easy_install ibm_db_sa-0.2.1-py2.5.egg
     Linux/Unix:
       $ sudo easy_install ibm_db_sa-0.2.1-py2.5.egg
   
