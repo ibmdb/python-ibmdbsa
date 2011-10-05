@@ -11,7 +11,15 @@ The IBM_DB_SA adapter is packaged as a Python Egg component and is dependent on:
  - IBM_DB_DBI Python wrapper (ibm_db_dbi)
  - IBM_DB Python driver (ibm_db)
  - IBM Data Server Driver for ODBC and CLI (db2cli) version 9
-
+ 
+Prerequisites
+=============
+1. Python 2.5.x or Jython 2.5.x .
+2. SQLAlchemy 0.6.x or above
+3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher (ibm_db-1.0.5 is 
+   a minimum) for Python, or db2jcc.jar and db2jcc_license_cu.jar for Jython
+4. Optional ClientAccess ODBC Driver, or jt400.jar and util400.jar for 
+   Jython to connect to DB2 for iSeries
 
 Install and Configuration
 =========================
@@ -43,8 +51,44 @@ and follow up with these additional steps to install IBM_DB_SA:
     Linux/Unix:
       $ sudo easy_install -m ibm_db_sa==0.2.1   
       $ sudo rm -rf Python25\Lib\site-packages\ibm_db_sa-0.2.1-py2.5.egg
+      
+This ibm_db_sa dialect support several alternate drivers which its usage follows
+SQLAlchemy standard connection string pattern:
 
+Prior from SQLAlchemy 0.7.3:
 
+  1. Using default ibm_db driver
+      ibm_db_sa://user:passwd@address:port/database
+      
+  2. Using alternate pyodbc driver
+      ibm_db_sa_pyodbc://user:passwd@address:port/database
+      
+  3. Special for Jython
+      ibm_db_sa_zxjdbc://user:passwd@address:port/database
+      
+  4. Using alternate pyodbc driver to connect to DB2 for i
+      ibm_db_sa_pyodbc400://user:passwd@address:port/database      
+      
+  5. Special for Jython to connect to DB2 for i
+      ibm_db_sa_zxjdbc400://user:passwd@address:port/database      
+      
+SQLAlchemy 0.7.3 and above:
+
+  1. Using default ibm_db driver
+      ibm_db_sa://user:passwd@address:port/database
+      
+  2. Using alternate pyodbc driver
+      ibm_db_sa+pyodbc://user:passwd@address:port/database
+      
+  3. Special for Jython
+      ibm_db_sa+zxjdbc://user:passwd@address:port/database
+      
+  4. Using alternate pyodbc driver to connect to DB2 for i
+      ibm_db_sa+pyodbc400://user:passwd@address:port/database      
+      
+  5. Special for Jython to connect to DB2 for i
+      ibm_db_sa+zxjdbc400://user:passwd@address:port/database
+      
 List of Operating Systems tested
 ================================
   - SuSE Linux Server 9 32 bit
@@ -53,10 +97,10 @@ List of Operating Systems tested
 
 
 Supported Databases
-====================
-  - IBM DB2 Universal Database for Linux/Unix/Windows versions 8.1 onwards
+===================
+  - IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards
   - Remote connections to i5/OS (iSeries)
-  - Remote connections to z/OS (DB2 UDB for zOS)
+  - Remote connections to z/OS (DB2 UDB for zOS), only by default ibm_db drivers
 
 Future Supported Databases
 ==========================
