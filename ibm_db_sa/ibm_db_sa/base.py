@@ -180,6 +180,13 @@ class IBM_DBBinary(sa_types.LargeBinary):
     else:
       return "BLOB(%s)" % self.length
 
+class IBM_DBOldBinary(sa_types.Binary):
+  def get_col_spec(self):
+    if self.length is None:
+      return "BLOB(1M)"
+    else:
+      return "BLOB(%s)" % self.length
+
 class IBM_DBString(sa_types.String):
   def get_col_spec(self):
     if self.length is None:
@@ -404,6 +411,7 @@ class IBM_DBXML(sa_types.Text):
 # The dictionary uses the SQLAlchemy data types as key, and maps an IBM_DB type as its value
 colspecs = {
     sa_types.LargeBinary  : IBM_DBBinary,
+    sa_types.Binary       : IBM_DBOldBinary,
     sa_types.String       : IBM_DBString,
     sa_types.Boolean      : IBM_DBBoolean,
     sa_types.Integer      : IBM_DBInteger,
@@ -532,8 +540,23 @@ class IBM_DBTypeCompiler(compiler.GenericTypeCompiler):
   def visit_NUMERIC(self, type_):
     return self.visit_DECIMAL(type_)
 
+  def visit_numeric(self, type_):
+    return self.visit_DECIMAL(type_)
+
   def visit_datetime(self, type_):
     return self.visit_TIMESTAMP(type_)
+
+  def visit_date(self, type_):
+    return self.visit_DATE(type_)
+
+  def visit_time(self, type_):
+    return self.visit_TIME(type_)
+
+  def visit_integer(self, type_):
+    return self.visit_INT(type_)
+
+  def visit_boolean(self, type_):
+    return self.visit_SMALLINT(type_)
 
   def visit_float(self, type_):
     return self.visit_FLOAT(type_)
@@ -546,6 +569,9 @@ class IBM_DBTypeCompiler(compiler.GenericTypeCompiler):
 
   def visit_unicode_text(self, type_):
     return self.visit_VARGRAPHIC(type_)
+
+  def visit_string(self, type_):
+    return self.visit_VARCHAR(type_)
 
   def visit_TEXT(self, type_):
     return self.visit_VARCHAR(type_)
@@ -608,6 +634,18 @@ class IBM_DBCompiler(compiler.SQLCompiler):
          self.process(join.right, asfrom=True, **kwargs),
          " ON ",
          self.process(join.onclause, **kwargs)))
+
+  def returning_clause(self, stmt, returning_cols):
+    def create_out_param(col, i):
+        bindparam = sql.outparam("ret_%d" % i, type_=col.type)
+        self.binds[bindparam.key] = bindparam
+        return self.bindparam_string(self._truncate_bindparam(bindparam))
+
+    columnlist = list(expression._select_iterables(returning_cols))
+    columns = [self.process(c, within_columns_clause=False, result_map=self.result_map) for c in columnlist]
+    binds = [create_out_param(c, i) for i, c in enumerate(columnlist)]
+    return 'RETURNING ' + ', '.join(columns) +  " INTO " + ", ".join(binds)
+
 
 class IBM_DBDDLCompiler(compiler.DDLCompiler):
 
@@ -700,7 +738,7 @@ class IBM_DBIdentifierPreparer(compiler.IdentifierPreparer):
 
 class IBM_DBExecutionContext(default.DefaultExecutionContext):
     def fire_sequence(self, seq, type_):
-        return self._execute_scalar("SELECT NEXTVAL FOR" +
+        return self._execute_scalar("SELECT NEXTVAL FOR " +
                     self.dialect.identifier_preparer.format_sequence(seq) +
                     " FROM SYSIBM.SYSDUMMY1", type_)
 
@@ -761,7 +799,7 @@ class IBM_DBDialect(default.DefaultDialect):
   def _get_default_schema_name(self, connection):
     """Return: current setting of the schema attribute
     """
-    default_schema_name = connection.execute(u'SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1;').scalar()
+    default_schema_name = connection.execute(u'SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1').scalar()
     if isinstance(default_schema_name, str):
       default_schema_name = default_schema_name.strip()
     return self.normalize_name(default_schema_name)
