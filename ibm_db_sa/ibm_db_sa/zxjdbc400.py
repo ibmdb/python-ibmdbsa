@@ -169,6 +169,8 @@ class IBM_DB400ZxJDBCDialect(ZxJDBCConnector, ibm_base400.IBM_DB400Dialect):
 
   supports_unicode_statements = supports_unicode_binds = \
     returns_unicode_strings = supports_unicode = False
+  supports_sane_rowcount        = False
+  supports_sane_multi_rowcount  = False
 
   jdbc_db_name = 'as400'
   jdbc_driver_name = 'com.ibm.as400.access.AS400JDBCDriver'

@@ -59,8 +59,6 @@ class IBM_DBPyODBCNumeric(sa_types.Numeric):
 class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
 
   supports_unicode_statements   = False
-  supports_sane_rowcount        = True
-  supports_sane_multi_rowcount  = True
   supports_native_decimal       = True
   supports_char_length          = True
   supports_native_decimal       = False

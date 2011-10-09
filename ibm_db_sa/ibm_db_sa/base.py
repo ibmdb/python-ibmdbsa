@@ -172,6 +172,19 @@ sys_views = Table("VIEWS", ischema,
   Column("TEXT", CoerceUnicode, key="text"),
   schema="SYSCAT")
 
+sys_sequences = Table("SEQUENCES", ischema,
+  Column("SEQSCHEMA", CoerceUnicode, key="seqschema"),
+  Column("SEQNAME", CoerceUnicode, key="seqname"),
+  Column("DEFINER", CoerceUnicode, key="definer"),
+  Column("DEFINERTYPE", CoerceUnicode, key="definertype"),
+  Column("OWNER", CoerceUnicode, key="owner"),
+  Column("OWNERTYPE", CoerceUnicode, key="ownertype"),
+  Column("SEQID", sa_types.Integer, key="seqid"),
+  Column("SEQTYPE", CoerceUnicode, key="seqtype"),
+  Column("BASESEQSCHEMA", CoerceUnicode, key="baseseqschema"),
+  Column("BASESEQNAME", CoerceUnicode, key="baseseqname"),
+  schema="SYSCAT")
+
 # Override module sqlalchemy.types
 class IBM_DBBinary(sa_types.LargeBinary):
   def get_col_spec(self):
@@ -635,18 +648,6 @@ class IBM_DBCompiler(compiler.SQLCompiler):
          " ON ",
          self.process(join.onclause, **kwargs)))
 
-  def returning_clause(self, stmt, returning_cols):
-    def create_out_param(col, i):
-        bindparam = sql.outparam("ret_%d" % i, type_=col.type)
-        self.binds[bindparam.key] = bindparam
-        return self.bindparam_string(self._truncate_bindparam(bindparam))
-
-    columnlist = list(expression._select_iterables(returning_cols))
-    columns = [self.process(c, within_columns_clause=False, result_map=self.result_map) for c in columnlist]
-    binds = [create_out_param(c, i) for i, c in enumerate(columnlist)]
-    return 'RETURNING ' + ', '.join(columns) +  " INTO " + ", ".join(binds)
-
-
 class IBM_DBDDLCompiler(compiler.DDLCompiler):
 
   def get_column_specification(self, column, **kw):
@@ -748,30 +749,36 @@ class IBM_DBExecutionContext(default.DefaultExecutionContext):
           "FROM SYSIBM.SYSDUMMY1")
       lastrowid = cursor.fetchone()[0]
       cursor.close()
+      if lastrowid is not None:
+        lastrowid = int(lastrowid)
       return lastrowid
 
 class IBM_DBDialect(default.DefaultDialect):
   """Details of the IBM_DB dialect.  Not used directly in application code."""
 
-  name                          = 'ibm_db_sa'
-  supports_alter                = True
-  max_identifier_length         = 128
-  encoding                      = 'utf-8'
-  supports_sane_rowcount        = True
-  supports_sane_multi_rowcount  = True
-  preexecute_sequences          = False
-  default_paramstyle            = 'named'
-  colspecs                      = colspecs
-  ischema_names                 = ischema_names
-  supports_char_length          = False
-  supports_unicode_statements = supports_unicode_binds = False
-  returns_unicode_strings = supports_unicode = True
+  name = 'ibm_db_sa'
+  supports_alter = True
+  max_identifier_length = 128
+  encoding = 'utf-8'
+  supports_sane_rowcount = True
+  supports_sane_multi_rowcount = True
+  preexecute_sequences = False
+  default_paramstyle = 'named'
+  colspecs = colspecs
+  ischema_names = ischema_names
+  supports_char_length = False
+  supports_unicode_statements = False
+  supports_unicode_binds = False
+  returns_unicode_strings = False
+  postfetch_lastrowid = True
+  supports_sane_rowcount = False
+  supports_sane_multi_rowcount = False
 
-  statement_compiler            = IBM_DBCompiler
-  ddl_compiler                  = IBM_DBDDLCompiler
-  type_compiler                 = IBM_DBTypeCompiler
-  preparer                      = IBM_DBIdentifierPreparer
-  execution_ctx_cls             = IBM_DBExecutionContext
+  statement_compiler = IBM_DBCompiler
+  ddl_compiler = IBM_DBDDLCompiler
+  type_compiler = IBM_DBTypeCompiler
+  preparer = IBM_DBIdentifierPreparer
+  execution_ctx_cls = IBM_DBExecutionContext
 
   def __init__(self, use_ansiquotes=None, **kwargs):
     super(IBM_DBDialect, self).__init__(**kwargs)
@@ -812,7 +819,19 @@ class IBM_DBDialect(default.DefaultDialect):
                                sys_tables.c.tabname==table_name)
     else:
         whereclause = sys_tables.c.tabname==table_name
-    s = sql.select([sys_tables], whereclause)
+    s = sql.select([sys_tables.c.tabname], whereclause)
+    c = connection.execute(s)
+    return c.first() is not None
+
+  def has_sequence(self, connection, sequence_name, schema=None):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    sequence_name = self.denormalize_name(sequence_name)
+    if current_schema:
+        whereclause = sql.and_(sys_sequences.c.seqschema==current_schema,
+                               sys_sequences.c.seqname==sequence_name)
+    else:
+        whereclause = sys_sequences.c.seqname==sequence_name
+    s = sql.select([sys_sequences.c.seqname], whereclause)
     c = connection.execute(s)
     return c.first() is not None
 
@@ -985,12 +1004,6 @@ class IBM_DBDialect(default.DefaultDialect):
 
   def _compat_first(self, rp, charset=None):
     return _DecodingRowProxy(rp.first(), charset)
-
-  def do_executemany(self, cursor, statement, parameters, context=None):
-    cursor.executemany(statement, parameters)
-
-  def do_execute(self, cursor, statement, parameters, context=None):
-    cursor.execute(statement, parameters)
 
 log.class_logger(IBM_DBDialect)
 
