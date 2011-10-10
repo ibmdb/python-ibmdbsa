@@ -175,14 +175,6 @@ sys_views = Table("VIEWS", ischema,
 sys_sequences = Table("SEQUENCES", ischema,
   Column("SEQSCHEMA", CoerceUnicode, key="seqschema"),
   Column("SEQNAME", CoerceUnicode, key="seqname"),
-  Column("DEFINER", CoerceUnicode, key="definer"),
-  Column("DEFINERTYPE", CoerceUnicode, key="definertype"),
-  Column("OWNER", CoerceUnicode, key="owner"),
-  Column("OWNERTYPE", CoerceUnicode, key="ownertype"),
-  Column("SEQID", sa_types.Integer, key="seqid"),
-  Column("SEQTYPE", CoerceUnicode, key="seqtype"),
-  Column("BASESEQSCHEMA", CoerceUnicode, key="baseseqschema"),
-  Column("BASESEQNAME", CoerceUnicode, key="baseseqname"),
   schema="SYSCAT")
 
 # Override module sqlalchemy.types
@@ -757,12 +749,8 @@ class IBM_DBDialect(default.DefaultDialect):
   """Details of the IBM_DB dialect.  Not used directly in application code."""
 
   name = 'ibm_db_sa'
-  supports_alter = True
   max_identifier_length = 128
   encoding = 'utf-8'
-  supports_sane_rowcount = True
-  supports_sane_multi_rowcount = True
-  preexecute_sequences = False
   default_paramstyle = 'named'
   colspecs = colspecs
   ischema_names = ischema_names
@@ -773,6 +761,11 @@ class IBM_DBDialect(default.DefaultDialect):
   postfetch_lastrowid = True
   supports_sane_rowcount = False
   supports_sane_multi_rowcount = False
+  supports_native_decimal = True
+  preexecute_sequences = False
+  supports_alter = True
+  supports_sequences = True
+  sequences_optional = True
 
   statement_compiler = IBM_DBCompiler
   ddl_compiler = IBM_DBDDLCompiler
@@ -923,7 +916,7 @@ class IBM_DBDialect(default.DefaultDialect):
     query = sql.select([sysindexes.c.colnames],
           sql.and_(
               sysindexes.c.tabschema == current_schema,
-              sysindexes.c.tabname == table_name.upper(),
+              sysindexes.c.tabname == table_name,
               sysindexes.c.uniquerule == 'P'
             ),
           order_by=[sysindexes.c.tabschema, sysindexes.c.tabname]
@@ -945,7 +938,7 @@ class IBM_DBDialect(default.DefaultDialect):
                         sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
         sql.and_(
           sysfkeys.c.fktabschema == current_schema,
-          sysfkeys.c.fktabname == table_name.upper()
+          sysfkeys.c.fktabname == table_name
         ),
         order_by=[sysfkeys.c.colno]
       )
@@ -973,7 +966,7 @@ class IBM_DBDialect(default.DefaultDialect):
     query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule],
         sql.and_(
           sysidx.c.tabschema == current_schema,
-          sysidx.c.tabname == table_name.upper()
+          sysidx.c.tabname == table_name
         ),
         order_by=[sysidx.c.tabname]
       )

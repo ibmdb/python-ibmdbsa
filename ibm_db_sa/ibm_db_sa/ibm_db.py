@@ -33,10 +33,9 @@ class IBM_DB_SADialect(ibm_base.IBM_DBDialect):
   driver                        = 'ibm_db_sa'
   supports_unicode_statements   = False
   supports_sane_rowcount        = True
-  supports_sane_multi_rowcount  = True
-  supports_native_decimal       = True
-  supports_char_length          = True
+  supports_sane_multi_rowcount  = False
   supports_native_decimal       = False
+  supports_char_length          = True
   execution_ctx_cls             = IBM_DB_SAExecutionContext
 
   colspecs = util.update_copy(

@@ -100,6 +100,11 @@ sys_views = Table("SYSVIEWS", ischema,
   Column("VIEW_DEFINITION", ibm_base.CoerceUnicode, key="text"),
   schema="QSYS2")
 
+sys_sequences = Table("SYSSEQUENCES", ischema,
+  Column("SEQUENCE_SCHEMA", ibm_base.CoerceUnicode, key="seqschema"),
+  Column("SEQUENCE_NAME", ibm_base.CoerceUnicode, key="seqname"),
+  schema="QSYS2")
+
 class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
 
   def __init__(self, use_ansiquotes=None, **kwargs):
@@ -114,6 +119,18 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
     else:
         whereclause = sys_tables.c.tabname==table_name
     s = sql.select([sys_tables], whereclause)
+    c = connection.execute(s)
+    return c.first() is not None
+
+  def has_sequence(self, connection, sequence_name, schema=None):
+    current_schema = self.denormalize_name(schema or self.default_schema_name)
+    sequence_name = self.denormalize_name(sequence_name)
+    if current_schema:
+        whereclause = sql.and_(sys_sequences.c.seqschema==current_schema,
+                               sys_sequences.c.seqname==sequence_name)
+    else:
+        whereclause = sys_sequences.c.seqname==sequence_name
+    s = sql.select([sys_sequences.c.seqname], whereclause)
     c = connection.execute(s)
     return c.first() is not None
 
@@ -170,7 +187,7 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
                         syscols.c.length, syscols.c.scale],
           sql.and_(
               syscols.c.tabschema == current_schema,
-              syscols.c.tabname == table_name.upper()
+              syscols.c.tabname == table_name
             ),
           order_by=[syscols.c.tabschema, syscols.c.tabname, syscols.c.colname, syscols.c.colno]
         )
@@ -227,7 +244,7 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
                         sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
         sql.and_(
           sysfkeys.c.fktabschema == current_schema,
-          sysfkeys.c.fktabname == table_name.upper()
+          sysfkeys.c.fktabname == table_name
         ),
         order_by=[sysfkeys.c.colno]
       )
@@ -257,7 +274,7 @@ class IBM_DB400Dialect(ibm_base.IBM_DBDialect):
           syskey.c.indschema == sysidx.c.indschema,
           syskey.c.indname == sysidx.c.indname,
           sysidx.c.tabschema == current_schema,
-          sysidx.c.tabname == table_name.upper()
+          sysidx.c.tabname == table_name
         ), order_by = [syskey.c.indname, syskey.c.colno]
       )
     indexes = {}
