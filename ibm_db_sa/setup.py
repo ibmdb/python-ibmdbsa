@@ -46,4 +46,6 @@ setup( name    = PACKAGE,
        },
        include_package_data = True,
        zip_safe             = False,
+       tests_require=['nose >= 0.11'],
+       test_suite="sqla_nose.py",
      )
