@@ -4,7 +4,7 @@ from sys import platform
 from setuptools import setup, find_packages
 from distutils.core import setup
 
-PACKAGE = 'ibmdbsa'
+PACKAGE = 'ibm_db_sa'
 VERSION = '0.2.1'
 LICENSE = 'Apache License 2.0'
 
