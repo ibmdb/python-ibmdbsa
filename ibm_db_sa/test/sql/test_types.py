@@ -629,11 +629,11 @@ class UnicodeTest(fixtures.TestBase, AssertsExecutionResults):
                 ('sqlite','pysqlite'),
                 ('oracle','zxjdbc'),
                 ('oracle','cx_oracle'),
-                ('ibmdbsa', 'ibm_db'),
-                ('ibmdbsa', 'pyodbc'),
-                ('ibmdbsa', 'zxjdbc'),
-                ('ibmdbsa', 'pyodbc400'),
-                ('ibmdbsa', 'zxjdbc400'),
+                ('ibm_db_sa', 'ibm_db'),
+                ('ibm_db_sa', 'pyodbc'),
+                ('ibm_db_sa', 'zxjdbc'),
+                ('ibm_db_sa', 'pyodbc400'),
+                ('ibm_db_sa', 'zxjdbc400'),
 
             )), \
             "name: %s driver %s returns_unicode_strings=%s" % \

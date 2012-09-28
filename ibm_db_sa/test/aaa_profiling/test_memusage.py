@@ -83,7 +83,7 @@ class MemUsageTest(EnsureZeroed):
             x[-1:] = [Foo(), Foo(), Foo(), Foo(), Foo(), Foo()]
         go()
 
-    @testing.fails_if(lambda : testing.db.dialect.name == 'ibmdbsa' )
+    @testing.fails_if(lambda : testing.db.dialect.name == 'ibm_db_sa' )
     def test_session(self):
         metadata = MetaData(testing.db)
 
@@ -144,7 +144,7 @@ class MemUsageTest(EnsureZeroed):
         assert_no_mappers()
 
     @testing.crashes('sqlite', ':memory: connection not suitable here')
-    @testing.fails_if(lambda : testing.db.dialect.name == 'ibmdbsa' )
+    @testing.fails_if(lambda : testing.db.dialect.name == 'ibm_db_sa' )
     def test_orm_many_engines(self):
         metadata = MetaData(testing.db)
 
@@ -244,7 +244,7 @@ class MemUsageTest(EnsureZeroed):
         assert not eng.dialect._type_memos
 
 
-    @testing.fails_if(lambda : testing.db.dialect.name in ['ibmdbsa', 'sqlite'] )
+    @testing.fails_if(lambda : testing.db.dialect.name in ['ibm_db_sa', 'sqlite'] )
     def test_many_updates(self):
         metadata = MetaData(testing.db)
 
@@ -290,7 +290,7 @@ class MemUsageTest(EnsureZeroed):
         finally:
             metadata.drop_all()
 
-    @testing.fails_if(lambda : testing.db.dialect.name in ['ibmdbsa', 'sqlite'] )
+    @testing.fails_if(lambda : testing.db.dialect.name in ['ibm_db_sa', 'sqlite'] )
     def test_unicode_warnings(self):
         metadata = MetaData(testing.db)
         table1 = Table('mytable', metadata, Column('col1', Integer,
@@ -315,7 +315,7 @@ class MemUsageTest(EnsureZeroed):
         finally:
             metadata.drop_all()
 
-    @testing.fails_if(lambda : testing.db.dialect.name in ['ibmdbsa', 'sqlite'] )
+    @testing.fails_if(lambda : testing.db.dialect.name in ['ibm_db_sa', 'sqlite'] )
     def test_mapper_reset(self):
         metadata = MetaData(testing.db)
 
@@ -373,7 +373,7 @@ class MemUsageTest(EnsureZeroed):
             metadata.drop_all()
         assert_no_mappers()
 
-    @testing.fails_if(lambda : testing.db.dialect.name == 'ibmdbsa' )
+    @testing.fails_if(lambda : testing.db.dialect.name == 'ibm_db_sa' )
     def test_with_inheritance(self):
         metadata = MetaData(testing.db)
 
@@ -435,7 +435,7 @@ class MemUsageTest(EnsureZeroed):
             metadata.drop_all()
         assert_no_mappers()
 
-    @testing.fails_if(lambda : testing.db.dialect.name == 'ibmdbsa' )
+    @testing.fails_if(lambda : testing.db.dialect.name == 'ibm_db_sa' )
     def test_with_manytomany(self):
         metadata = MetaData(testing.db)
 
@@ -507,7 +507,7 @@ class MemUsageTest(EnsureZeroed):
     # in pysqlite itself. background at:
     # http://thread.gmane.org/gmane.comp.python.db.pysqlite.user/2290
 
-    @testing.fails_if(lambda : testing.db.dialect.name in ['sqlite', 'ibmdbsa'] )
+    @testing.fails_if(lambda : testing.db.dialect.name in ['sqlite', 'ibm_db_sa'] )
     def test_join_cache(self):
         metadata = MetaData(testing.db)
         table1 = Table('table1', metadata, Column('id', Integer,
