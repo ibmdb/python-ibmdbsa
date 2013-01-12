@@ -405,7 +405,7 @@ class IBM_DBDouble(sa_types.Float):
     else:
       return 'DOUBLE(%(precision)s)' % self.precision
 
-class IBM_DBBigInteger(sa_types.TypeEngine):
+class IBM_DBBigInteger(sa_types.BigInteger):
   def get_col_spec(self):
     return 'BIGINT'
 
@@ -421,6 +421,7 @@ colspecs = {
     sa_types.String       : IBM_DBString,
     sa_types.Boolean      : IBM_DBBoolean,
     sa_types.Integer      : IBM_DBInteger,
+    sa_types.BigInteger   : IBM_DBBigInteger,
     sa_types.Numeric      : IBM_DBNumeric,
     sa_types.DateTime     : IBM_DBDateTime,
     sa_types.Date         : IBM_DBDate,
