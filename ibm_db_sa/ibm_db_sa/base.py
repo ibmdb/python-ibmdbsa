@@ -690,8 +690,7 @@ class IBM_DBDDLCompiler(compiler.DDLCompiler):
 
   def visit_drop_index(self, drop):
     index = drop.element
-    return "\nDROP INDEX %s.%s" % (
-            self.preparer.quote_identifier(drop.element.table.name),
+    return "\nDROP INDEX %s" % (
             self.preparer.quote(
                         self._index_identifier(drop.element.name),
                         drop.element.quote)
