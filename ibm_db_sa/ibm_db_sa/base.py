@@ -662,9 +662,19 @@ class IBM_DBDDLCompiler(compiler.DDLCompiler):
     # default-clause:
     default = self.get_column_default_string(column)
     if default is not None:
-      col_spec.append('WITH DEFAULT')
-      #default = default.lstrip("'").rstrip("'")
-      col_spec.append(default)
+        col_spec.append('WITH DEFAULT')
+        col_spec.append(default)
+    else: 
+        if isinstance(column.type, sa_types.Boolean):       
+            default = column.default
+            if default is not None:
+                if column.default.arg == True:
+                    default = '1'
+                elif column.default.arg == False:
+                    default = '0'
+                
+                col_spec.append('WITH DEFAULT')
+                col_spec.append(default)
 
     # generated-column-spec:
 
