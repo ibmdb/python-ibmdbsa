@@ -208,10 +208,8 @@ class IBM_DBBoolean(sa_types.Boolean):
     def process(value):
       if value is None:
         return None
-      if value == False:
-        return 0
-      elif value == True:
-        return 1
+      if value in ( 0, 1 ):
+        return bool( value )
     return process
 
   def bind_processor(self, dialect):
