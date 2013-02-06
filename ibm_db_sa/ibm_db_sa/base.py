@@ -317,6 +317,10 @@ class DB2Compiler(compiler.SQLCompiler):
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
 
+    def visit_mod_binary(self, binary, operator, **kw):
+        return "mod(%s, %s)" % (self.process(binary.left),
+                                                self.process(binary.right))
+
     def limit_clause(self, select):
         if select._limit is not None:
             return " FETCH FIRST %s ROWS ONLY" % select._limit
