@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008.                                      |
+# | (C) Copyright IBM Corporation 2008,2013.                                      |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.4 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -13,7 +13,7 @@
 # | KIND, either express or implied. See the License for the specific        |
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
-# | Authors: Jaimy Azle                                                      |
+# | Authors: Jaimy Azle, Rahul Priyadarshi                                   |
 # | Version: 0.2.x                                                           |
 # +--------------------------------------------------------------------------+
 from decimal import Decimal as _python_Decimal
@@ -100,7 +100,7 @@ class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
       else:
         port = ''
         if 'port' in keys and not 'port' in query:
-          port = ',%d' % int(keys.pop('port'))
+          port = '%d' % int(keys.pop('port'))
 
         database = keys.pop('database', '')
         db_alias = database
@@ -109,9 +109,8 @@ class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
 
         connectors = ["driver={%s}" %
                         keys.pop('driver', self.pyodbc_driver_name),
-                      'server=%s%s' % (keys.pop('host', ''), port),
-                      'database=%s' % database,
-                      'dbalias=%s' % db_alias]
+                      'hostname=%s;port=%s' % (keys.pop('host', ''), port),
+                      'database=%s' % database]
 
         user = keys.pop("user", None)
         if user:
