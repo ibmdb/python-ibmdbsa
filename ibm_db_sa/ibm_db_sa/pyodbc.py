@@ -107,7 +107,7 @@ class IBM_DBPyODBCDialect(PyODBCConnector, ibm_base.IBM_DBDialect):
         if 'alias' in keys and not 'alias' in query:
           db_alias = keys.pop('alias')
 
-        connectors = ["driver={%s}" %
+        connectors = ["DRIVER={%s}" %
                         keys.pop('driver', self.pyodbc_driver_name),
                       'hostname=%s;port=%s' % (keys.pop('host', ''), port),
                       'database=%s' % database]
