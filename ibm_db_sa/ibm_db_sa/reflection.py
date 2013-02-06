@@ -237,8 +237,7 @@ class DB2Reflector(BaseReflector):
                     'name': self.normalize_name(r[0]),
                     'type': coltype,
                     'nullable': r[3] == 'Y',
-                    'default': r[2],
-                    'autoincrement': r[2] is None
+                    'default': r[2] or None,
                 })
         return sa_columns
 

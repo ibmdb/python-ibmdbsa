@@ -305,7 +305,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
         return self.visit_VARCHAR(type_)
 
     def visit_TEXT(self, type_):
-        return self.visit_VARCHAR(type_)
+        return self.visit_CLOB(type_)
 
     def visit_large_binary(self, type_):
         return self.visit_BLOB(type_)
