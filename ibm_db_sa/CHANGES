@@ -6,6 +6,7 @@ CHANGES
 - Refactor code layout
 - Now supporting "db2://" scheme as well as
   "ibm_db://" for backwards compatibility
+- Add/fix support for explicit sequences
 
  2011/09/27 (IBM_DB_SA adapter 0.2.1):
  - fix reflection problem

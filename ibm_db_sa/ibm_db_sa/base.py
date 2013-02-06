@@ -323,6 +323,9 @@ class DB2Compiler(compiler.SQLCompiler):
         else:
             return ""
 
+    def visit_sequence(self, sequence):
+        return "NEXT VALUE FOR %s" % sequence.name
+
     def default_from(self):
         # DB2 uses SYSIBM.SYSDUMMY1 table for row count
         return  " FROM SYSIBM.SYSDUMMY1"
@@ -424,17 +427,16 @@ class DB2IdentifierPreparer(compiler.IdentifierPreparer):
 
 
 class DB2ExecutionContext(default.DefaultExecutionContext):
-    pass
+    def fire_sequence(self, seq, type_):
+        return self._execute_scalar("SELECT NEXTVAL FOR " +
+                    self.dialect.identifier_preparer.format_sequence(seq) +
+                    " FROM SYSIBM.SYSDUMMY1", type_)
 
 
 class _SelectLastRowIDMixin(object):
     _select_lastrowid = False
     _lastrowid = None
 
-    def fire_sequence(self, seq, type_):
-        return self._execute_scalar("SELECT NEXTVAL FOR " +
-                    self.dialect.identifier_preparer.format_sequence(seq) +
-                    " FROM SYSIBM.SYSDUMMY1", type_)
 
     def getlastrowid(self):
         return self._lastrowid
@@ -480,6 +482,9 @@ class DB2Dialect(default.DefaultDialect):
     supports_alter = True
     supports_sequences = True
     sequences_optional = True
+
+    supports_default_values = False
+    supports_empty_insert = False
 
     statement_compiler = DB2Compiler
     ddl_compiler = DB2DDLCompiler
