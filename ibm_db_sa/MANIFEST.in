@@ -1,6 +1,4 @@
-# any kind of "*" pulls in __init__.pyc files,
-# so all extensions are explicit.
+recursive-include test *.py
 
-include README* LICENSE CHANGES*
+include README* LICENSE distribute_setup.py CHANGES* run_tests.py
 
-prune test

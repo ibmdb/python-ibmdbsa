@@ -1,51 +1,55 @@
 #!/usr/bin/env python
 
-from sys import platform
-from setuptools import setup, find_packages
-from distutils.core import setup
+from setuptools import setup
+import os
+import re
 
-PACKAGE = 'ibm_db_sa'
-VERSION = '0.2.1'
-LICENSE = 'Apache License 2.0'
 
-IS_JYTHON = platform.startswith("java")
-setup( name    = PACKAGE,
-       version = VERSION,
-       license = LICENSE,
-       description  = 'SQLAlchemy support for IBM Data Servers',
-       author       = 'IBM Application Development Team',
-       author_email = 'opendev@us.ibm.com',
-       url          = 'http://pypi.python.org/pypi/ibm_db/',
-       download_url = 'http://code.google.com/p/ibm-db/downloads/list',
-       keywords     = 'sqlalchemy database interface IBM Data Servers DB2 Informix IDS',
-       classifiers  = ['Development Status :: 4 - Beta',
-                      'Intended Audience :: Developers',
-                      'License :: OSI Approved :: Apache License 2.0',
-                      'Operating System :: OS Independent',
-                      'Topic :: Databases :: Front-end, middle-tier'],
-       long_description = '''
-                      IBM_DB_SA implementats the SQLAlchemy version 0.7.0 specification
-                      in support of IBM Data Servers: DB2 8 and 9, Informix IDS 11''',
-       platforms        = 'All',
-       install_requires = ['sqlalchemy>=0.6.0'] if IS_JYTHON else ['ibm_db>=1.0.5', 'sqlalchemy>=0.6.0'],
-       dependency_links = ['http://pypi.python.org/pypi/SQLAlchemy/'] if IS_JYTHON else ['http://pypi.python.org/pypi/ibm_db/', 'http://pypi.python.org/pypi/SQLAlchemy/'],
-       packages     = find_packages(),
-       data_files   = [ ('', ['./README']),
-                        ('', ['./CHANGES']),
-                        ('', ['./LICENSE']) ],
-       entry_points = {
-         'sqlalchemy.dialects': ['ibm_db_sa = ibm_db_sa.base:dialect',
-                                 'ibm_db_sa.zxjdbc = ibm_db_sa.zxjdbc:dialect',
-                                 'ibm_db_sa.pyodbc = ibm_db_sa.pyodbc:dialect',
-                                 'ibm_db_sa.zxjdbc400 = ibm_db_sa.zxjdbc400:dialect',
-                                 'ibm_db_sa.pyodbc400 = ibm_db_sa.pyodbc400:dialect',
-                                 'ibm_db_sa_zxjdbc = ibm_db_sa.zxjdbc:dialect',
-                                 'ibm_db_sa_pyodbc = ibm_db_sa.pyodbc:dialect',
-                                 'ibm_db_sa_zxjdbc400 = ibm_db_sa.zxjdbc400:dialect',
-                                 'ibm_db_sa_pyodbc400 = ibm_db_sa.pyodbc400:dialect',]
+v = open(os.path.join(os.path.dirname(__file__), 'ibm_db_sa', '__init__.py'))
+VERSION = re.compile(r".*__version__ = '(.*?)'", re.S).match(v.read()).group(1)
+v.close()
+
+readme = os.path.join(os.path.dirname(__file__), 'README.rst')
+
+setup(
+         name='ibm_db_sa',
+         version=VERSION,
+         license='Apache License 2.0',
+         description='SQLAlchemy support for IBM Data Servers',
+         author='IBM Application Development Team',
+         author_email='opendev@us.ibm.com',
+         url='http://github.com/zzzeek/ibm_db_sa',
+         keywords='sqlalchemy database interface IBM Data Servers DB2 Informix IDS',
+         classifiers=[
+            'Development Status :: 4 - Beta',
+            'Intended Audience :: Developers',
+            'License :: OSI Approved :: Apache License 2.0',
+            'Operating System :: OS Independent',
+            'Topic :: Databases :: Front-end, middle-tier'
+        ],
+         long_description=open(readme).read(),
+         platforms='All',
+         install_requires=['sqlalchemy>=0.7.3'],
+         packages=['ibm_db_sa'],
+        entry_points={
+         'sqlalchemy.dialects': [
+                     'db2=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
+                     'db2.ibm_db=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
+                     'db2.zxjdbc=ibm_db_sa.zxjdbc:DB2Dialect_zxjdbc',
+                     'db2.pyodbc=ibm_db_sa.pyodbc:DB2Dialect_pyodbc',
+                     'db2.zxjdbc400=ibm_db_sa.zxjdbc:AS400Dialect_zxjdbc',
+                     'db2.pyodbc400=ibm_db_sa.pyodbc:AS400Dialect_pyodbc',
+
+                     # older "ibm_db_sa://" style for backwards
+                     # compatibility
+                     'ibm_db_sa=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
+                     'db2.ibm_db=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
+                     'ibm_db_sa.zxjdbc=ibm_db_sa.zxjdbc:DB2Dialect_zxjdbc',
+                     'ibm_db_sa.pyodbc=ibm_db_sa.pyodbc:DB2Dialect_pyodbc',
+                     'ibm_db_sa.zxjdbc400=ibm_db_sa.zxjdbc:AS400Dialect_zxjdbc',
+                     'ibm_db_sa.pyodbc400=ibm_db_sa.pyodbc:AS400Dialect_pyodbc',
+                    ]
        },
-       include_package_data = True,
-       zip_safe             = False,
+       zip_safe=False,
        tests_require=['nose >= 0.11'],
-       test_suite="sqla_nose.py",
      )
