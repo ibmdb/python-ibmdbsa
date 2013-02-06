@@ -112,20 +112,18 @@ class _IBM_Boolean(sa_types.Boolean):
         def process(value):
             if value is None:
                 return None
-            if value == False:
-                return 0
-            elif value == True:
-                return 1
+            else:
+                return bool(value)
         return process
 
     def bind_processor(self, dialect):
         def process(value):
             if value is None:
                 return None
-            if value == False:
-                return '0'
-            elif value == True:
+            elif bool(value):
                 return '1'
+            else:
+                return '0'
         return process
 
 
