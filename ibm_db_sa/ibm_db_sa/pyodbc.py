@@ -13,7 +13,7 @@
 # | KIND, either express or implied. See the License for the specific        |
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
-# | Authors: Jaimy Azle                                                      |
+# | Authors: Jaimy Azle, Rahul Priyadarshi                                   |
 # | Contributors: Mike Bayer                                                 |
 # | Version: 0.3.x                                                           |
 # +--------------------------------------------------------------------------+
@@ -61,18 +61,14 @@ class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
             else:
                 port = ''
                 if 'port' in keys and not 'port' in query:
-                    port = ',%d' % int(keys.pop('port'))
+                    port = '%d' % int(keys.pop('port'))
 
                 database = keys.pop('database', '')
-                db_alias = database
-                if 'alias' in keys and not 'alias' in query:
-                    db_alias = keys.pop('alias')
 
-                connectors = ["driver={%s}" %
+                connectors = ["DRIVER={%s}" %
                                 keys.pop('driver', self.pyodbc_driver_name),
-                            'server=%s%s' % (keys.pop('host', ''), port),
-                            'database=%s' % database,
-                            'dbalias=%s' % db_alias]
+                            'hostname=%s;port=%s' % (keys.pop('host', ''), port),
+                            'database=%s' % database]
 
                 user = keys.pop("user", None)
                 if user:
