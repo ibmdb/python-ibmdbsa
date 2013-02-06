@@ -483,6 +483,8 @@ class DB2Dialect(default.DefaultDialect):
     supports_sequences = True
     sequences_optional = True
 
+    requires_name_normalize = True
+
     supports_default_values = False
     supports_empty_insert = False
 
