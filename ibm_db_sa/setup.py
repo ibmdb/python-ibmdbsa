@@ -43,7 +43,6 @@ setup(
                      # older "ibm_db_sa://" style for backwards
                      # compatibility
                      'ibm_db_sa=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
-                     'db2.ibm_db=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
                      'ibm_db_sa.zxjdbc=ibm_db_sa.zxjdbc:DB2Dialect_zxjdbc',
                      'ibm_db_sa.pyodbc=ibm_db_sa.pyodbc:DB2Dialect_pyodbc',
                      'ibm_db_sa.zxjdbc400=ibm_db_sa.zxjdbc:AS400Dialect_zxjdbc',
