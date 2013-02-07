@@ -23,6 +23,7 @@
 import datetime
 from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
+from sqlalchemy import util
 from sqlalchemy.sql import compiler
 from sqlalchemy.engine import default
 
@@ -125,8 +126,6 @@ class _IBM_Boolean(sa_types.Boolean):
             else:
                 return '0'
         return process
-
-
 
 class _IBM_Date(sa_types.Date):
 
@@ -398,6 +397,17 @@ class DB2DDLCompiler(compiler.DDLCompiler):
 
         column_spec = ' '.join(col_spec)
         return column_spec
+
+    def define_constraint_cascades(self, constraint):
+        text = ""
+        if constraint.ondelete is not None:
+            text += " ON DELETE %s" % constraint.ondelete
+
+        if constraint.onupdate is not None:
+            util.warn(
+                "DB2 does not support UPDATE CASCADE for foreign keys.")
+
+        return text
 
     def visit_drop_index(self, drop, **kw):
         return "\nDROP INDEX %s" % (

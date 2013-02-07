@@ -20,6 +20,16 @@
 
 from .base import DB2ExecutionContext, DB2Dialect
 
+from sqlalchemy import processors, types as sa_types, util
+
+class _IBM_Numeric_ibm_db(sa_types.Numeric):
+    def result_processor(self, dialect, coltype):
+        if self.asdecimal:
+            return None
+        else:
+            return processors.to_float
+
+
 class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 
     def get_lastrowid(self):
@@ -34,6 +44,13 @@ class DB2Dialect_ibm_db(DB2Dialect):
     supports_native_decimal = False
     supports_char_length = True
     execution_ctx_cls = DB2ExecutionContext_ibm_db
+
+    colspecs = util.update_copy(
+        DB2Dialect.colspecs,
+        {
+            sa_types.Numeric: _IBM_Numeric_ibm_db
+        }
+    )
 
     @classmethod
     def dbapi(cls):
