@@ -478,7 +478,7 @@ class _SelectLastRowIDMixin(object):
 
 class DB2Dialect(default.DefaultDialect):
 
-    name = 'db2'
+    name = 'ibm_db_sa'
     max_identifier_length = 128
     encoding = 'utf-8'
     default_paramstyle = 'named'
