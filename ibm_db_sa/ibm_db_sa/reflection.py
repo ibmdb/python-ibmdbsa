@@ -13,9 +13,8 @@
 # | KIND, either express or implied. See the License for the specific        |
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
-# | Authors: Alex Pitigoi, Abhigyan Agrawal                                  |
+# | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
-# | Version: 0.3.x                                                           |
 # +--------------------------------------------------------------------------+
 
 from sqlalchemy import types as sa_types
@@ -185,10 +184,10 @@ class DB2Reflector(BaseReflector):
     def get_view_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
 
-        query = sql.select([self.sys_views.c.viewname],
-            self.sys_views.c.viewschema == current_schema,
-            order_by=[self.sys_views.c.viewname]
-          )
+        query = sql.select([self.sys_views.c.viewname]).\
+            where(self.sys_views.c.viewschema == current_schema).\
+            order_by(self.sys_views.c.viewname)
+            
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -196,10 +195,10 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         viewname = self.denormalize_name(viewname)
 
-        query = sql.select([self.sys_views.c.text],
-            self.sys_views.c.viewschema == current_schema,
-            self.sys_views.c.viewname == viewname
-          )
+        query = sql.select([self.sys_views.c.text]).\
+            where(self.sys_views.c.viewschema == current_schema).\
+            where(self.sys_views.c.viewname == viewname)
+            
         return connection.execute(query).scalar()
 
     @reflection.cache

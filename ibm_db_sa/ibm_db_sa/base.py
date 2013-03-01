@@ -13,14 +13,13 @@
 # | KIND, either express or implied. See the License for the specific        |
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
-# | Authors: Alex Pitigoi, Abhigyan Agrawal                                  |
+# | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
-# | Version: 0.3.x                                                           |
 # +--------------------------------------------------------------------------+
 """Support for IBM DB2 database
 
 """
-import datetime
+import datetime, re
 from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
 from sqlalchemy import util
@@ -226,8 +225,9 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
     def visit_BIGINT(self, type_):
         return "BIGINT"
 
-    def visit_REAL(self, type_):
-        return "REAL"
+    def visit_FLOAT(self, type_):
+        return "FLOAT" if type_.precision is None else \
+                "FLOAT(%(precision)s)" % {'precision': type_.precision}
 
     def visit_XML(self, type_):
         return "XML"
@@ -292,7 +292,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
         return self.visit_SMALLINT(type_)
 
     def visit_float(self, type_):
-        return self.visit_REAL(type_)
+        return self.visit_FLOAT(type_)
 
     def visit_unicode(self, type_):
         return self.visit_VARGRAPHIC(type_)
@@ -312,7 +312,6 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
 
 class DB2Compiler(compiler.SQLCompiler):
 
-
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
 
@@ -321,23 +320,85 @@ class DB2Compiler(compiler.SQLCompiler):
                                                 self.process(binary.right))
 
     def limit_clause(self, select):
-        if select._limit is not None:
+        if (select._limit is not None) and (select._offset is None):
             return " FETCH FIRST %s ROWS ONLY" % select._limit
         else:
             return ""
+        
+    def visit_select(self, select, **kwargs):
+        limit, offset = select._limit, select._offset
+        sql_ori = compiler.SQLCompiler.visit_select(self, select, **kwargs)
+        if offset is not None:
+            __rownum = 'Z.__ROWNUM'
+            sql_split = re.split("[\s+]FROM ", sql_ori, 1)
+            sql_sec = ""
+            sql_sec = " \nFROM %s " % ( sql_split[1] )
+                
+            dummyVal = "Z.__db2_"
+            sql_pri = ""
+            
+            sql_sel = "SELECT "
+            if select._distinct:
+                sql_sel = "SELECT DISTINCT "
 
+            sql_select_token = sql_split[0].split( "," )
+            i = 0
+            while ( i < len( sql_select_token ) ):
+                if sql_select_token[i].count( "TIMESTAMP(DATE(SUBSTR(CHAR(" ) == 1:
+                    sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
+                    sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % ( 
+                                    sql_pri,
+                                    sql_select_token[i],
+                                    sql_select_token[i + 1],
+                                    sql_select_token[i + 2],
+                                    sql_select_token[i + 3],
+                                    dummyVal, i + 1 )
+                    i = i + 4
+                    continue
+                
+                if sql_select_token[i].count( " AS " ) == 1:
+                    temp_col_alias = sql_select_token[i].split( " AS " )
+                    sql_pri = '%s %s,' % ( sql_pri, sql_select_token[i] )
+                    sql_sel = "%s %s," % ( sql_sel, temp_col_alias[1] )
+                    i = i + 1
+                    continue
+            
+                sql_pri = '%s %s AS "%s%d",' % ( sql_pri, sql_select_token[i], dummyVal, i + 1 )
+                sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
+                i = i + 1
+
+            sql_pri = sql_pri[:len( sql_pri ) - 1]
+            sql_pri = "%s%s" % ( sql_pri, sql_sec )
+            sql_sel = sql_sel[:len( sql_sel ) - 1]
+            sql = '%s, ( ROW_NUMBER() OVER() ) AS "%s" FROM ( %s ) AS M' % ( sql_sel, __rownum, sql_pri )
+            sql = '%s FROM ( %s ) Z WHERE' % ( sql_sel, sql )
+            
+            if offset is not 0:
+                sql = '%s "%s" > %d' % ( sql, __rownum, offset )
+            if offset is not 0 and limit is not None:
+                sql = '%s AND ' % ( sql )
+            if limit is not None:
+                sql = '%s "%s" <= %d' % ( sql, __rownum, offset + limit )
+            return "( %s )" % ( sql, )
+        else:
+            return sql_ori
+    
     def visit_sequence(self, sequence):
         return "NEXT VALUE FOR %s" % sequence.name
 
     def default_from(self):
         # DB2 uses SYSIBM.SYSDUMMY1 table for row count
         return  " FROM SYSIBM.SYSDUMMY1"
-
-    #def visit_function(self, func, result_map=None, **kwargs):
+    
+    def visit_function(self, func, result_map=None, **kwargs):
+        if func.name.upper() == "AVG":
+            return "AVG(DOUBLE(%s))" % (self.function_argspec(func, **kwargs))
+        else:
+            return compiler.SQLCompiler.visit_function(self, func, **kwargs)        
     # TODO: this is wrong but need to know what DB2 is expecting here
     #    if func.name.upper() == "LENGTH":
     #        return "LENGTH('%s')" % func.compile().params[func.name + '_1']
-    #   else:
+    #    else:
     #        return compiler.SQLCompiler.visit_function(self, func, **kwargs)
 
 
@@ -371,8 +432,16 @@ class DB2Compiler(compiler.SQLCompiler):
              self.process(join.right, asfrom=True, **kwargs),
              " ON ",
              self.process(join.onclause, **kwargs)))
+    
+    def visit_savepoint(self, savepoint_stmt):
+        return "SAVEPOINT %(sid)s ON ROLLBACK RETAIN CURSORS" % {'sid':self.preparer.format_savepoint(savepoint_stmt)}
 
-
+    def visit_rollback_to_savepoint(self, savepoint_stmt):
+        return 'ROLLBACK TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
+       
+    def visit_release_savepoint(self, savepoint_stmt):
+        return 'RELEASE TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
+        
 class DB2DDLCompiler(compiler.DDLCompiler):
 
     def get_column_specification(self, column, **kw):
@@ -445,8 +514,7 @@ class DB2ExecutionContext(default.DefaultExecutionContext):
         return self._execute_scalar("SELECT NEXTVAL FOR " +
                     self.dialect.identifier_preparer.format_sequence(seq) +
                     " FROM SYSIBM.SYSDUMMY1", type_)
-
-
+                    
 class _SelectLastRowIDMixin(object):
     _select_lastrowid = False
     _lastrowid = None
@@ -489,8 +557,8 @@ class DB2Dialect(default.DefaultDialect):
     supports_unicode_binds = False
     returns_unicode_strings = False
     postfetch_lastrowid = True
-    supports_sane_rowcount = False
-    supports_sane_multi_rowcount = False
+    supports_sane_rowcount = True
+    supports_sane_multi_rowcount = True
     supports_native_decimal = True
     preexecute_sequences = False
     supports_alter = True
@@ -501,6 +569,9 @@ class DB2Dialect(default.DefaultDialect):
 
     supports_default_values = False
     supports_empty_insert = False
+
+    two_phase_transactions = False
+    savepoints =  True 
 
     statement_compiler = DB2Compiler
     ddl_compiler = DB2DDLCompiler

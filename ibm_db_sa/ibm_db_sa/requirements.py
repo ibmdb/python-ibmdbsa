@@ -38,9 +38,9 @@ class Requirements(SuiteRequirements):
 
         return exclusions.closed()
 
-    @property
-    def offset(self):
-        return exclusions.closed()
+    #@property
+    #def offset(self):
+    #    return exclusions.closed()
 
     @property
     def window_functions(self):

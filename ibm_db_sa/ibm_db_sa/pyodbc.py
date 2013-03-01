@@ -15,7 +15,6 @@
 # +--------------------------------------------------------------------------+
 # | Authors: Jaimy Azle, Rahul Priyadarshi                                   |
 # | Contributors: Mike Bayer                                                 |
-# | Version: 0.3.x                                                           |
 # +--------------------------------------------------------------------------+
 from sqlalchemy import util
 import urllib

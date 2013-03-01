@@ -1,6 +1,11 @@
 CHANGES
 =======
-
+2013/03/01 (IBM_DB_SA adapter 0.3.0)
+- Add support for LIMIT/OFFSET
+- Add support for savepoints
+- Add support for double-precision floating-point number
+- Fixed reflection for get_view_names and get_view_definition
+ 
 2013/02/06
 - Add support for SQLAlchemy 0.7/0.8
 - Refactor code layout

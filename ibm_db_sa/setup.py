@@ -18,7 +18,8 @@ setup(
          description='SQLAlchemy support for IBM Data Servers',
          author='IBM Application Development Team',
          author_email='opendev@us.ibm.com',
-         url='http://github.com/zzzeek/ibm_db_sa',
+         url='http://pypi.python.org/pypi/ibm_db_sa/',
+         download_url='http://code.google.com/p/ibm-db/downloads/list',
          keywords='sqlalchemy database interface IBM Data Servers DB2 Informix IDS',
          classifiers=[
             'Development Status :: 4 - Beta',
