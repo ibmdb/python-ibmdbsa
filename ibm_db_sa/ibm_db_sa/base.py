@@ -228,6 +228,9 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
     def visit_FLOAT(self, type_):
         return "FLOAT" if type_.precision is None else \
                 "FLOAT(%(precision)s)" % {'precision': type_.precision}
+                
+    def visit_DOUBLE(self, type_):
+        return "DOUBLE"
 
     def visit_XML(self, type_):
         return "XML"
