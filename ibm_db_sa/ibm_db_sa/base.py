@@ -317,7 +317,15 @@ class DB2Compiler(compiler.SQLCompiler):
 
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
-
+    
+    def for_update_clause(self, select):
+        if select.for_update == True:
+            return ' WITH RS USE AND KEEP UPDATE LOCKS'
+        elif select.for_update == 'read':
+            return ' WITH RS USE AND KEEP SHARE LOCKS'
+        else:
+            return ''
+            
     def visit_mod_binary(self, binary, operator, **kw):
         return "mod(%s, %s)" % (self.process(binary.left),
                                                 self.process(binary.right))
@@ -327,7 +335,7 @@ class DB2Compiler(compiler.SQLCompiler):
             return " FETCH FIRST %s ROWS ONLY" % select._limit
         else:
             return ""
-        
+       
     def visit_select(self, select, **kwargs):
         limit, offset = select._limit, select._offset
         sql_ori = compiler.SQLCompiler.visit_select(self, select, **kwargs)
