@@ -17,8 +17,8 @@
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
 
-from .base import DB2ExecutionContext, DB2Dialect
-
+from .base import DB2ExecutionContext, DB2Dialect, DB2ExecutionContext
+from sqlalchemy.engine import result as _result
 from sqlalchemy import processors, types as sa_types, util
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
@@ -33,7 +33,32 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 
     def get_lastrowid(self):
         return self.cursor.last_identity_val
-
+        
+    def pre_exec(self):
+        # if a single execute, check for outparams
+        if len(self.compiled_parameters) == 1:
+            for bindparam in self.compiled.binds.values():
+                if bindparam.isoutparam:
+                    self.cursor.out_parameters = True
+                    break
+                
+    def get_result_proxy(self):
+        if hasattr(self.cursor, 'out_parameters'):
+            self.statement = self.statement.split('(', 1)[0].split()[1]
+            parameters = self.cursor.callproc(self.statement, self.parameters.__getitem__(0))
+            result = _result.ResultProxy(self)
+            result.out_parameters = {}
+            
+            for bindparam in self.compiled.binds.values():
+                if bindparam.isoutparam:
+                    name = self.compiled.bind_names[bindparam]
+                    result.out_parameters[name] = parameters[self.compiled.positiontup.index(name)]
+            del self.cursor.out_parameters
+            
+            return result
+        else:
+            return _result.ResultProxy(self)
+         
 class DB2Dialect_ibm_db(DB2Dialect):
 
     driver = 'ibm_db_sa'
@@ -57,7 +82,13 @@ class DB2Dialect_ibm_db(DB2Dialect):
         """
         import ibm_db_dbi as module
         return module
-
+        
+    def do_execute(self, cursor, statement, parameters, context=None):
+        if hasattr( cursor, 'out_parameters'):
+            pass
+        else:
+            cursor.execute(statement, parameters)
+            
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
 
