@@ -17,7 +17,7 @@
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
 
-from .base import DB2ExecutionContext, DB2Dialect, DB2ExecutionContext
+from .base import DB2ExecutionContext, DB2Dialect
 from sqlalchemy.engine import result as _result
 from sqlalchemy import processors, types as sa_types, util
 
