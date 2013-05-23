@@ -30,6 +30,8 @@ class _IBM_Numeric_ibm_db(sa_types.Numeric):
 
 
 class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
+    _callproc_result = None
+    _out_parameters = None
 
     def get_lastrowid(self):
         return self.cursor.last_identity_val
@@ -39,21 +41,18 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
         if len(self.compiled_parameters) == 1:
             for bindparam in self.compiled.binds.values():
                 if bindparam.isoutparam:
-                    self.cursor.out_parameters = True
+                    self._out_parameters = True
                     break
                 
     def get_result_proxy(self):
-        if hasattr(self.cursor, 'out_parameters'):
-            self.statement = self.statement.split('(', 1)[0].split()[1]
-            parameters = self.cursor.callproc(self.statement, self.parameters.__getitem__(0))
+        if self._callproc_result and self._out_parameters:
             result = _result.ResultProxy(self)
             result.out_parameters = {}
             
             for bindparam in self.compiled.binds.values():
                 if bindparam.isoutparam:
                     name = self.compiled.bind_names[bindparam]
-                    result.out_parameters[name] = parameters[self.compiled.positiontup.index(name)]
-            del self.cursor.out_parameters
+                    result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
             
             return result
         else:
@@ -84,8 +83,9 @@ class DB2Dialect_ibm_db(DB2Dialect):
         return module
         
     def do_execute(self, cursor, statement, parameters, context=None):
-        if hasattr( cursor, 'out_parameters'):
-            pass
+        if context and context._out_parameters:
+            statement = statement.split('(', 1)[0].split()[1]
+            context._callproc_result = cursor.callproc(statement, parameters)
         else:
             cursor.execute(statement, parameters)
             
