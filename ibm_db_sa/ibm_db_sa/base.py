@@ -146,6 +146,18 @@ class _IBM_Date(sa_types.Date):
             return str(value)
         return process
 
+class _IBM_DateTime(sa_types.DateTime):
+    def bind_processor(self, dialect):
+        def process(value):
+            if value is None:
+                return None
+                
+            if isinstance(value, basestring):
+                if value.rfind('T') > 0:
+                   value = value.replace('T', ' ')
+            return value
+        return process
+        
 class DOUBLE(sa_types.Numeric):
     __visit_name__ = 'DOUBLE'
 
@@ -171,6 +183,7 @@ class XML(sa_types.Text):
 colspecs = {
     sa_types.Boolean: _IBM_Boolean,
     sa_types.Date: _IBM_Date,
+    sa_types.DateTime: _IBM_DateTime
 # really ?
 #    sa_types.Unicode: DB2VARGRAPHIC
 }
