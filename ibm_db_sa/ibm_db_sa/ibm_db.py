@@ -18,7 +18,7 @@
 # +--------------------------------------------------------------------------+
 
 from .base import DB2ExecutionContext, DB2Dialect
-
+from sqlalchemy.engine import result as _result
 from sqlalchemy import processors, types as sa_types, util
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
@@ -30,9 +30,34 @@ class _IBM_Numeric_ibm_db(sa_types.Numeric):
 
 
 class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
+    _callproc_result = None
+    _out_parameters = None
 
     def get_lastrowid(self):
         return self.cursor.last_identity_val
+
+
+    def pre_exec(self):
+        # if a single execute, check for outparams
+        if len(self.compiled_parameters) == 1:
+            for bindparam in self.compiled.binds.values():
+                if bindparam.isoutparam:
+                    self._out_parameters = True
+                    break
+
+	def get_result_proxy(self):
+	    if self._callproc_result and self._out_parameters:
+	        result = _result.ResultProxy(self)
+	        result.out_parameters = {}
+
+	        for bindparam in self.compiled.binds.values():
+	            if bindparam.isoutparam:
+	                name = self.compiled.bind_names[bindparam]
+	                result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
+
+	        return result
+	    else:
+	        return _result.ResultProxy(self)
 
 class DB2Dialect_ibm_db(DB2Dialect):
 
@@ -57,6 +82,13 @@ class DB2Dialect_ibm_db(DB2Dialect):
         """
         import ibm_db_dbi as module
         return module
+
+    def do_execute(self, cursor, statement, parameters, context=None):
+        if context and context._out_parameters:
+            statement = statement.split('(', 1)[0].split()[1]
+            context._callproc_result = cursor.callproc(statement, parameters)
+        else:
+            cursor.execute(statement, parameters)
 
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
