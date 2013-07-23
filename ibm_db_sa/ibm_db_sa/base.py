@@ -30,7 +30,7 @@ from . import reflection as ibm_reflection
 
 from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER,\
     SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP,\
-    VARCHAR
+    VARCHAR, FLOAT
 
 
 # as documented from:
@@ -146,18 +146,6 @@ class _IBM_Date(sa_types.Date):
             return str(value)
         return process
 
-class _IBM_DateTime(sa_types.DateTime):
-    def bind_processor(self, dialect):
-        def process(value):
-            if value is None:
-                return None
-                
-            if isinstance(value, basestring):
-                if value.rfind('T') > 0:
-                   value = value.replace('T', ' ')
-            return value
-        return process
-        
 class DOUBLE(sa_types.Numeric):
     __visit_name__ = 'DOUBLE'
 
@@ -183,7 +171,6 @@ class XML(sa_types.Text):
 colspecs = {
     sa_types.Boolean: _IBM_Boolean,
     sa_types.Date: _IBM_Date,
-    sa_types.DateTime: _IBM_DateTime
 # really ?
 #    sa_types.Unicode: DB2VARGRAPHIC
 }
@@ -202,6 +189,7 @@ ischema_names = {
     'NUMERIC': NUMERIC,
     'REAL': REAL,
     'DOUBLE': DOUBLE,
+    'FLOAT': FLOAT,
     'TIME': TIME,
     'TIMESTAMP': TIMESTAMP,
     'VARCHAR': VARCHAR,
@@ -544,28 +532,28 @@ class _SelectLastRowIDMixin(object):
     _lastrowid = None
 
 
-    def getlastrowid(self):
+    def get_lastrowid(self):        
         return self._lastrowid
 
-    def pre_exec(self):
-        if self.isinsert:
+    def pre_exec(self):        
+        if self.isinsert:            
             tbl = self.compiled.statement.table
             seq_column = tbl._autoincrement_column
             insert_has_sequence = seq_column is not None
 
             self._select_lastrowid = insert_has_sequence and \
                                         not self.compiled.returning and \
-                                        not self.compiled.inline
+                                        not self.compiled.inline                
 
-    def post_exec(self):
+    def post_exec(self):        
         conn = self.root_connection
-        if self._select_lastrowid:
+        if self._select_lastrowid:            
             conn._cursor_execute(self.cursor,
                     "SELECT IDENTITY_VAL_LOCAL() FROM SYSIBM.SYSDUMMY1",
                     (), self)
             row = self.cursor.fetchall()[0]
             if row[0] is not None:
-                self._lastrowid = int(row[0])
+                self._lastrowid = int(row[0])            
 
 
 class DB2Dialect(default.DefaultDialect):

@@ -1,5 +1,11 @@
 CHANGES
 =======
+
+2013/07/23 (IBM_DB_SA adapter 0.3.1)
+- Add/Fix support for zxjdbc for both IBM DB LUW and AS/400
+- Add/Fix support for PyODBC for both IBM DB LUW and AS/400
+- Fix reflection for get_lastrowid
+
 2013/03/01 (IBM_DB_SA adapter 0.3.0)
 - Add support for LIMIT/OFFSET
 - Add support for savepoints
