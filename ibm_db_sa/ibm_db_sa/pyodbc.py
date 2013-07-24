@@ -29,7 +29,6 @@ class DB2ExecutionContext_pyodbc(_SelectLastRowIDMixin, DB2ExecutionContext):
 class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
 
     supports_unicode_statements = False
-    supports_native_decimal = True
     supports_char_length = True
     supports_native_decimal = False
 

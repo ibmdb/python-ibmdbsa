@@ -42,7 +42,7 @@ class BaseReflector(object):
     def normalize_name(self, name):
         if isinstance(name, str):
             name = name.decode(self.dialect.encoding)
-        elif name != None:
+        if name != None:
             return name.lower() if name.upper() == name and \
                not self.identifier_preparer._requires_quotes(name.lower()) \
                else name
@@ -191,7 +191,7 @@ class DB2Reflector(BaseReflector):
         query = sql.select([self.sys_views.c.viewname]).\
             where(self.sys_views.c.viewschema == current_schema).\
             order_by(self.sys_views.c.viewname)
-            
+
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -202,7 +202,7 @@ class DB2Reflector(BaseReflector):
         query = sql.select([self.sys_views.c.text]).\
             where(self.sys_views.c.viewschema == current_schema).\
             where(self.sys_views.c.viewname == viewname)
-            
+
         return connection.execute(query).scalar()
 
     @reflection.cache
@@ -213,7 +213,7 @@ class DB2Reflector(BaseReflector):
 
         query = sql.select([syscols.c.colname, syscols.c.typename,
                             syscols.c.defaultval, syscols.c.nullable,
-                            syscols.c.length, syscols.c.scale, 
+                            syscols.c.length, syscols.c.scale,
                             syscols.c.identity, syscols.c.generated],
               sql.and_(
                   syscols.c.tabschema == current_schema,
@@ -498,7 +498,7 @@ class AS400Reflector(BaseReflector):
         query = sql.select([syscols.c.colname,
                                 syscols.c.typename,
                                 syscols.c.defaultval, syscols.c.nullable,
-                                syscols.c.length, syscols.c.scale, 
+                                syscols.c.length, syscols.c.scale,
                                 syscols.c.isid, syscols.c.idgenerate],
                     sql.and_(
                             syscols.c.tabschema == current_schema,
@@ -555,7 +555,7 @@ class AS400Reflector(BaseReflector):
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
         current_schema = self.denormalize_name(schema or default_schema)
-        default_schema = self.normalize_name(default_schema)               
+        default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
         query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
@@ -572,13 +572,13 @@ class AS400Reflector(BaseReflector):
         for r in connection.execute(query):
             if not fschema.has_key(r[0]):
                 referred_schema = self.normalize_name(r[5])
-                
+
                 # if no schema specified and referred schema here is the
                 # default, then set to None
                 if schema is None and \
                     referred_schema == default_schema:
                     referred_schema = None
-                    
+
                 fschema[r[0]] = {'name': self.normalize_name(r[0]),
                             'constrained_columns': [self.normalize_name(r[3])],
                             'referred_schema': referred_schema,
