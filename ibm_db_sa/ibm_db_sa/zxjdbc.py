@@ -33,7 +33,6 @@ from sqlalchemy.connectors.zxJDBC import ZxJDBCConnector
 from .base import _SelectLastRowIDMixin, DB2Dialect, DB2ExecutionContext, DB2Compiler
 from . import reflection as ibm_reflection
 
-
 class DB2ExecutionContext_zxjdbc(_SelectLastRowIDMixin, DB2ExecutionContext):
 
     def create_cursor(self):
@@ -45,8 +44,11 @@ class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
 
     supports_unicode_statements = supports_unicode_binds = \
     returns_unicode_strings = supports_unicode = False
-    supports_sane_rowcount = False
     supports_sane_multi_rowcount = False
+
+    supports_unicode_statements = False
+    supports_sane_rowcount = True
+    supports_char_length = True
 
     jdbc_db_name = 'db2'
     jdbc_driver_name = 'com.ibm.db2.jcc.DB2Driver'
@@ -85,9 +87,6 @@ class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
 class AS400Dialect_zxjdbc(DB2Dialect_zxjdbc):
     jdbc_db_name = 'as400'
     jdbc_driver_name = 'com.ibm.as400.access.AS400JDBCDriver'
-    
-    supports_unicode_statements = supports_unicode_binds = \
-    returns_unicode_strings = supports_unicode = True
 
     _reflector_cls = ibm_reflection.AS400Reflector
 

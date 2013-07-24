@@ -146,19 +146,19 @@ class _IBM_Date(sa_types.Date):
             return str(value)
         return process
 
-class _IBM_DateTime(sa_types.DateTime):		
-    
-    def bind_processor(self, dialect):		
-        def process(value):		
-            if value is None:		
-                return None		
-			
-            if isinstance(value, basestring):		
+class _IBM_DateTime(sa_types.DateTime):
+
+    def bind_processor(self, dialect):
+        def process(value):
+            if value is None:
+                return None
+
+            if isinstance(value, basestring):
                 if value.rfind('T') > 0:
                     value = value.replace('T', ' ')
-            return value		
+            return value
         return process
-        
+
 class DOUBLE(sa_types.Numeric):
     __visit_name__ = 'DOUBLE'
 
@@ -184,7 +184,7 @@ class XML(sa_types.Text):
 colspecs = {
     sa_types.Boolean: _IBM_Boolean,
     sa_types.Date: _IBM_Date,
-    sa_types.DateTime: _IBM_DateTime      
+    sa_types.DateTime: _IBM_DateTime
 # really ?
 #    sa_types.Unicode: DB2VARGRAPHIC
 }
@@ -243,7 +243,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
     def visit_FLOAT(self, type_):
         return "FLOAT" if type_.precision is None else \
                 "FLOAT(%(precision)s)" % {'precision': type_.precision}
-                
+
     def visit_DOUBLE(self, type_):
         return "DOUBLE"
 
@@ -332,7 +332,7 @@ class DB2Compiler(compiler.SQLCompiler):
 
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
-    
+
     def for_update_clause(self, select):
         if select.for_update == True:
             return ' WITH RS USE AND KEEP UPDATE LOCKS'
@@ -340,7 +340,7 @@ class DB2Compiler(compiler.SQLCompiler):
             return ' WITH RS USE AND KEEP SHARE LOCKS'
         else:
             return ''
-            
+
     def visit_mod_binary(self, binary, operator, **kw):
         return "mod(%s, %s)" % (self.process(binary.left),
                                                 self.process(binary.right))
@@ -350,7 +350,7 @@ class DB2Compiler(compiler.SQLCompiler):
             return " FETCH FIRST %s ROWS ONLY" % select._limit
         else:
             return ""
-       
+
     def visit_select(self, select, **kwargs):
         limit, offset = select._limit, select._offset
         sql_ori = compiler.SQLCompiler.visit_select(self, select, **kwargs)
@@ -359,10 +359,10 @@ class DB2Compiler(compiler.SQLCompiler):
             sql_split = re.split("[\s+]FROM ", sql_ori, 1)
             sql_sec = ""
             sql_sec = " \nFROM %s " % ( sql_split[1] )
-                
+
             dummyVal = "Z.__db2_"
             sql_pri = ""
-            
+
             sql_sel = "SELECT "
             if select._distinct:
                 sql_sel = "SELECT DISTINCT "
@@ -372,7 +372,7 @@ class DB2Compiler(compiler.SQLCompiler):
             while ( i < len( sql_select_token ) ):
                 if sql_select_token[i].count( "TIMESTAMP(DATE(SUBSTR(CHAR(" ) == 1:
                     sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
-                    sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % ( 
+                    sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % (
                                     sql_pri,
                                     sql_select_token[i],
                                     sql_select_token[i + 1],
@@ -381,14 +381,14 @@ class DB2Compiler(compiler.SQLCompiler):
                                     dummyVal, i + 1 )
                     i = i + 4
                     continue
-                
+
                 if sql_select_token[i].count( " AS " ) == 1:
                     temp_col_alias = sql_select_token[i].split( " AS " )
                     sql_pri = '%s %s,' % ( sql_pri, sql_select_token[i] )
                     sql_sel = "%s %s," % ( sql_sel, temp_col_alias[1] )
                     i = i + 1
                     continue
-            
+
                 sql_pri = '%s %s AS "%s%d",' % ( sql_pri, sql_select_token[i], dummyVal, i + 1 )
                 sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
                 i = i + 1
@@ -398,7 +398,7 @@ class DB2Compiler(compiler.SQLCompiler):
             sql_sel = sql_sel[:len( sql_sel ) - 1]
             sql = '%s, ( ROW_NUMBER() OVER() ) AS "%s" FROM ( %s ) AS M' % ( sql_sel, __rownum, sql_pri )
             sql = '%s FROM ( %s ) Z WHERE' % ( sql_sel, sql )
-            
+
             if offset is not 0:
                 sql = '%s "%s" > %d' % ( sql, __rownum, offset )
             if offset is not 0 and limit is not None:
@@ -408,19 +408,19 @@ class DB2Compiler(compiler.SQLCompiler):
             return "( %s )" % ( sql, )
         else:
             return sql_ori
-    
+
     def visit_sequence(self, sequence):
         return "NEXT VALUE FOR %s" % sequence.name
 
     def default_from(self):
         # DB2 uses SYSIBM.SYSDUMMY1 table for row count
         return  " FROM SYSIBM.SYSDUMMY1"
-    
+
     def visit_function(self, func, result_map=None, **kwargs):
         if func.name.upper() == "AVG":
             return "AVG(DOUBLE(%s))" % (self.function_argspec(func, **kwargs))
         else:
-            return compiler.SQLCompiler.visit_function(self, func, **kwargs)        
+            return compiler.SQLCompiler.visit_function(self, func, **kwargs)
     # TODO: this is wrong but need to know what DB2 is expecting here
     #    if func.name.upper() == "LENGTH":
     #        return "LENGTH('%s')" % func.compile().params[func.name + '_1']
@@ -458,16 +458,16 @@ class DB2Compiler(compiler.SQLCompiler):
              self.process(join.right, asfrom=True, **kwargs),
              " ON ",
              self.process(join.onclause, **kwargs)))
-    
+
     def visit_savepoint(self, savepoint_stmt):
         return "SAVEPOINT %(sid)s ON ROLLBACK RETAIN CURSORS" % {'sid':self.preparer.format_savepoint(savepoint_stmt)}
 
     def visit_rollback_to_savepoint(self, savepoint_stmt):
         return 'ROLLBACK TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
-       
+
     def visit_release_savepoint(self, savepoint_stmt):
         return 'RELEASE TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
-        
+
 class DB2DDLCompiler(compiler.DDLCompiler):
 
     def get_column_specification(self, column, **kw):
@@ -540,34 +540,34 @@ class DB2ExecutionContext(default.DefaultExecutionContext):
         return self._execute_scalar("SELECT NEXTVAL FOR " +
                     self.dialect.identifier_preparer.format_sequence(seq) +
                     " FROM SYSIBM.SYSDUMMY1", type_)
-                    
+
 class _SelectLastRowIDMixin(object):
     _select_lastrowid = False
     _lastrowid = None
 
 
-    def get_lastrowid(self):        
+    def get_lastrowid(self):
         return self._lastrowid
 
-    def pre_exec(self):        
-        if self.isinsert:            
+    def pre_exec(self):
+        if self.isinsert:
             tbl = self.compiled.statement.table
             seq_column = tbl._autoincrement_column
             insert_has_sequence = seq_column is not None
 
             self._select_lastrowid = insert_has_sequence and \
                                         not self.compiled.returning and \
-                                        not self.compiled.inline                
+                                        not self.compiled.inline
 
-    def post_exec(self):        
+    def post_exec(self):
         conn = self.root_connection
-        if self._select_lastrowid:            
+        if self._select_lastrowid:
             conn._cursor_execute(self.cursor,
                     "SELECT IDENTITY_VAL_LOCAL() FROM SYSIBM.SYSDUMMY1",
                     (), self)
             row = self.cursor.fetchall()[0]
             if row[0] is not None:
-                self._lastrowid = int(row[0])            
+                self._lastrowid = int(row[0])
 
 
 class DB2Dialect(default.DefaultDialect):
@@ -585,7 +585,7 @@ class DB2Dialect(default.DefaultDialect):
     postfetch_lastrowid = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = True
-    supports_native_decimal = True
+    supports_native_decimal = False
     preexecute_sequences = False
     supports_alter = True
     supports_sequences = True
@@ -597,7 +597,7 @@ class DB2Dialect(default.DefaultDialect):
     supports_empty_insert = False
 
     two_phase_transactions = False
-    savepoints =  True 
+    savepoints =  True
 
     statement_compiler = DB2Compiler
     ddl_compiler = DB2DDLCompiler
