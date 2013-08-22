@@ -25,13 +25,14 @@ from sqlalchemy import schema as sa_schema
 from sqlalchemy import util
 from sqlalchemy.sql import compiler
 from sqlalchemy.engine import default
-
+from sqlalchemy import __version__ as SA_Version
 from . import reflection as ibm_reflection
 
 from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER,\
     SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP,\
     VARCHAR, FLOAT
 
+SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 # as documented from:
 # http://publib.boulder.ibm.com/infocenter/db2luw/v9/index.jsp?topic=/com.ibm.db2.udb.doc/admin/r0001095.htm
@@ -146,19 +147,6 @@ class _IBM_Date(sa_types.Date):
             return str(value)
         return process
 
-class _IBM_DateTime(sa_types.DateTime):
-
-    def bind_processor(self, dialect):
-        def process(value):
-            if value is None:
-                return None
-
-            if isinstance(value, basestring):
-                if value.rfind('T') > 0:
-                    value = value.replace('T', ' ')
-            return value
-        return process
-
 class DOUBLE(sa_types.Numeric):
     __visit_name__ = 'DOUBLE'
 
@@ -183,8 +171,7 @@ class XML(sa_types.Text):
 
 colspecs = {
     sa_types.Boolean: _IBM_Boolean,
-    sa_types.Date: _IBM_Date,
-    sa_types.DateTime: _IBM_DateTime
+    sa_types.Date: _IBM_Date
 # really ?
 #    sa_types.Unicode: DB2VARGRAPHIC
 }
@@ -528,7 +515,55 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         return "ALTER TABLE %s DROP %s%s" % \
                                 (self.preparer.format_table(constraint.table),
                                 qual, const)
+                                
+    def create_table_constraints(self, table, **kw):
+        if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
+            for constraint in table._sorted_constraints:
+                if isinstance(constraint, sa_schema.UniqueConstraint):
+                    for column in constraint.columns._all_cols:
+                        if column.nullable:
+                            constraint.use_alter = True
+                            break
+                    if hasattr(constraint, 'use_alter') and constraint.use_alter:
+                        if not constraint.name:
+                            index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table), '_'.join(column.name for column in constraint.columns._all_cols))
+                        else:
+                            index_name = constraint.name
+                        index = sa_schema.Index(index_name, *(column for column in constraint.columns._all_cols))
+                        index.unique = True
+                        index.exclude_nulls = True
+        result = super( DB2DDLCompiler, self ).create_table_constraints(table, **kw)
+        return result
+    
+    def visit_create_index(self, create, include_schema=False, include_table_schema=True):
+        if SA_Version < [0, 8]:
+            sql = super( DB2DDLCompiler, self ).visit_create_index(create)
+        else:
+            sql = super( DB2DDLCompiler, self ).visit_create_index(create, include_schema, include_table_schema)
+        if getattr(create.element, 'exclude_nulls', None):
+            sql += ' EXCLUDE NULL KEYS'
+        return sql
 
+    def visit_add_constraint(self, create):
+        if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
+            if isinstance(create.element, sa_schema.UniqueConstraint):
+                for column in create.element.columns._all_cols:
+                    if column.nullable:
+                        create.element.exclude_nulls = True
+                        break
+                if getattr(create.element, 'exclude_nulls', None):
+                    if not create.element.name:
+                        index_name = "%s_%s_%s" % ('uk_index', self.preparer.format_table(create.element.table), '_'.join(column.name for column in create.element.columns._all_cols))
+                    else:
+                        index_name = create.element.name
+                    index = sa_schema.Index(index_name, *(column for column in create.element.columns._all_cols))
+                    index.unique = True
+                    index.exclude_nulls = True
+                    sql = self.visit_create_index(sa_schema.CreateIndex(index)) 
+                    return sql
+        sql = super( DB2DDLCompiler, self ).visit_add_constraint(create)
+        return sql
+    
 class DB2IdentifierPreparer(compiler.IdentifierPreparer):
 
     reserved_words = RESERVED_WORDS
@@ -614,7 +649,11 @@ class DB2Dialect(default.DefaultDialect):
 
     # reflection: these all defer to an BaseDB2Reflector
     # object which selects between DB2 and AS/400 schemas
-
+    def initialize(self, connection):
+        super(DB2Dialect, self).initialize(connection)
+        self.dbms_ver = connection.connection.dbms_ver
+        self.dbms_name = connection.connection.dbms_name
+        
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)
 

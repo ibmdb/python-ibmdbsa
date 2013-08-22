@@ -18,8 +18,14 @@
 # +--------------------------------------------------------------------------+
 
 from .base import DB2ExecutionContext, DB2Dialect
-from sqlalchemy.engine import result as _result
 from sqlalchemy import processors, types as sa_types, util
+from sqlalchemy import __version__ as SA_Version
+SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
+
+if SA_Version < [0, 8]:
+    from sqlalchemy.engine import base
+else:
+    from sqlalchemy.engine import result as _result
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
     def result_processor(self, dialect, coltype):
@@ -44,21 +50,28 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
                 if bindparam.isoutparam:
                     self._out_parameters = True
                     break
-
-	def get_result_proxy(self):
-	    if self._callproc_result and self._out_parameters:
-	        result = _result.ResultProxy(self)
-	        result.out_parameters = {}
-
-	        for bindparam in self.compiled.binds.values():
-	            if bindparam.isoutparam:
-	                name = self.compiled.bind_names[bindparam]
-	                result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
-
-	        return result
-	    else:
-	        return _result.ResultProxy(self)
-
+                
+    def get_result_proxy(self):
+        if self._callproc_result and self._out_parameters:
+            if SA_Version < [0, 8]:
+                result = base.ResultProxy(self)
+            else:
+                result = _result.ResultProxy(self)
+            result.out_parameters = {}
+            
+            for bindparam in self.compiled.binds.values():
+                if bindparam.isoutparam:
+                    name = self.compiled.bind_names[bindparam]
+                    result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
+            
+            return result
+        else:
+            if SA_Version < [0, 8]:
+                result = base.ResultProxy(self)
+            else:
+                result = _result.ResultProxy(self)
+            return result
+         
 class DB2Dialect_ibm_db(DB2Dialect):
 
     driver = 'ibm_db_sa'
