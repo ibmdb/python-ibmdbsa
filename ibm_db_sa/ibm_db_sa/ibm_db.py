@@ -146,7 +146,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
                                              self.dbapi.OperationalError)):
             return 'Connection is not active' in str(ex) or \
                         'connection is no longer active' in str(ex) or \
-                        'Connection Resource cannot be found' in str(ex)
+                        'Connection Resource cannot be found' in str(ex) or \
+                        'SQL30081N' in str(ex)
         else:
             return False
 
