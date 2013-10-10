@@ -407,7 +407,7 @@ class DB2Compiler(compiler.SQLCompiler):
         if func.name.upper() == "AVG":
             return "AVG(DOUBLE(%s))" % (self.function_argspec(func, **kwargs))
         elif func.name.upper() == "CHAR_LENGTH":
-            return "CHAR_LENGTH(%s, %s)" % (self.function_argspec(func, **kwargs), 'encoding' in kwargs.keys() and kwargs['encoding'] or 'OCTETS')
+            return "CHAR_LENGTH(%s, %s)" % (self.function_argspec(func, **kwargs), 'OCTETS')
         else:
             return compiler.SQLCompiler.visit_function(self, func, **kwargs)
     # TODO: this is wrong but need to know what DB2 is expecting here
