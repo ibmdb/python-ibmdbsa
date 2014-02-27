@@ -493,13 +493,6 @@ class DB2DDLCompiler(compiler.DDLCompiler):
 
         return text
 
-    def visit_drop_index(self, drop, **kw):
-        return "\nDROP INDEX %s" % (
-                        self.preparer.quote(
-                                    self._index_identifier(drop.element.name),
-                                    drop.element.quote)
-                        )
-
     def visit_drop_constraint(self, drop, **kw):
         constraint = drop.element
         if isinstance(constraint, sa_schema.ForeignKeyConstraint):
