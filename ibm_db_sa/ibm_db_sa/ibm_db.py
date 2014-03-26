@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008, 2013.                                |
+# | (C) Copyright IBM Corporation 2008, 2014.                                |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.8 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -80,6 +80,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
     supports_sane_multi_rowcount = False
     supports_native_decimal = False
     supports_char_length = True
+    supports_default_values = True
+    supports_multivalues_insert = True
     execution_ctx_cls = DB2ExecutionContext_ibm_db
 
     colspecs = util.update_copy(

@@ -1,7 +1,14 @@
 CHANGES
 =======
 
-2013/07/23 (IBM_DB_SA adapter 0.3.1)
+2014/03/26 (IBM_DB_SA adapter 0.3.1)
+- Handle Double Type in DDL Generator
+- Translating 'update' and 'read' lock-mode with DB2 compatible SQL
+- Added Stored procedure with outparam support in ibm_db_sa dialect
+- Convert nullable unique constraint to unique index exclude nulls for DB2 10.5
+- Fix to detect invalid connection
+- Added support for CHAR_LENGTH function support
+- Fix drop index implementation incompatibility with SQLAlchemy-0.8.x onwards
 - Add/Fix support for zxjdbc for both IBM DB LUW and AS/400
 - Add/Fix support for PyODBC for both IBM DB LUW and AS/400
 - Fix reflection for get_lastrowid

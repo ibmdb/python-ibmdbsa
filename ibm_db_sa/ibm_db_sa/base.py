@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008, 2013.                                |
+# | (C) Copyright IBM Corporation 2008, 2014.                                |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.8 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -530,7 +530,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         result = super( DB2DDLCompiler, self ).create_table_constraints(table, **kw)
         return result
     
-    def visit_create_index(self, create, include_schema=False, include_table_schema=True):
+    def visit_create_index(self, create, include_schema=True, include_table_schema=True):
         if SA_Version < [0, 8]:
             sql = super( DB2DDLCompiler, self ).visit_create_index(create)
         else:
@@ -605,7 +605,7 @@ class DB2Dialect(default.DefaultDialect):
     name = 'ibm_db_sa'
     max_identifier_length = 128
     encoding = 'utf-8'
-    default_paramstyle = 'named'
+    default_paramstyle = 'qmark'
     colspecs = colspecs
     ischema_names = ischema_names
     supports_char_length = False

@@ -5,7 +5,7 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.3.0 (2013/03/01)
+0.3.1 (2014/03/26)
 
 This version is all new for version 0.8 of SQLAlchemy and will also work with version 0.7.
 
@@ -24,7 +24,7 @@ Application Kit community portal:
 Please follow the steps provided to Install "Easy Install" in the link above and follow up with these additional steps to install IBM_DB_SA:
 
   1. To install IBM_DB_SA egg component available in the remote repositories
-  (pypi.python.org or code.google.com):
+  (pypi.python.org):
     Windows:
       > easy_install ibm_db_sa
     Linux/Unix:
@@ -57,8 +57,6 @@ For a local socket connection, exclude the "host" and "port" portions::
 Supported Databases
 -------------------
 - IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards
-- Remote connections to i5/OS (iSeries)
-- Remote connections to z/OS (DB2 UDB for zOS), only by default ibm_db drivers
 
 Known Limitations in ibm_db_sa adapter for DB2 databases
 -------------------------------------------------------------
