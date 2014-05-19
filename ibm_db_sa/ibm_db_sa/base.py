@@ -24,6 +24,7 @@ from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
 from sqlalchemy import util
 from sqlalchemy.sql import compiler
+from sqlalchemy.sql import operators
 from sqlalchemy.engine import default
 from sqlalchemy import __version__ as SA_Version
 from . import reflection as ibm_reflection
@@ -456,6 +457,14 @@ class DB2Compiler(compiler.SQLCompiler):
 
     def visit_release_savepoint(self, savepoint_stmt):
         return 'RELEASE TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
+    
+    def visit_unary(self, unary, **kw):
+        if (unary.operator == operators.exists)  and kw.get('within_columns_clause', False):
+            usql = super(DB2Compiler, self).visit_unary(unary, **kw)
+            usql = "CASE WHEN " + usql + " THEN 1 ELSE 0 END"
+            return usql
+        else:
+            return super(DB2Compiler, self).visit_unary(unary, **kw)
 
 class DB2DDLCompiler(compiler.DDLCompiler):
 
