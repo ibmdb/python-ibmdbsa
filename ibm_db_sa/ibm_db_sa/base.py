@@ -318,6 +318,13 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
 
 class DB2Compiler(compiler.SQLCompiler):
 
+    if SA_Version < [0, 9]:
+        def visit_fase(self, expr, **kw):
+            return '0'
+            
+        def visit_true(self, expr, **kw):
+            return '1'
+            
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
 
@@ -625,6 +632,7 @@ class DB2Dialect(default.DefaultDialect):
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = True
     supports_native_decimal = False
+    supports_native_boolean = False
     preexecute_sequences = False
     supports_alter = True
     supports_sequences = True
