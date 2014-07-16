@@ -319,7 +319,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
 class DB2Compiler(compiler.SQLCompiler):
 
     if SA_Version < [0, 9]:
-        def visit_fase(self, expr, **kw):
+        def visit_false(self, expr, **kw):
             return '0'
             
         def visit_true(self, expr, **kw):
