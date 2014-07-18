@@ -531,7 +531,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
             for constraint in table._sorted_constraints:
                 if isinstance(constraint, sa_schema.UniqueConstraint):
-                    columns = [constraint.columns.get(key) for key in create.element.columns.keys()]
+                    columns = [constraint.columns.get(key) for key in constraint.columns.keys()]
                     for column in columns:
                         if column.nullable:
                             constraint.use_alter = True
