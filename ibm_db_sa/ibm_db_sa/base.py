@@ -531,17 +531,16 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
             for constraint in table._sorted_constraints:
                 if isinstance(constraint, sa_schema.UniqueConstraint):
-                    columns = [constraint.columns.get(key) for key in constraint.columns.keys()]
-                    for column in columns:
+                    for column in constraint:
                         if column.nullable:
                             constraint.use_alter = True
                             break
                     if hasattr(constraint, 'use_alter') and constraint.use_alter:
                         if not constraint.name:
-                            index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table), '_'.join(column.name for column in columns))
+                            index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table), '_'.join(column.name for column in constraint))
                         else:
                             index_name = constraint.name
-                        index = sa_schema.Index(index_name, *(column for column in columns))
+                        index = sa_schema.Index(index_name, *(column for column in constraint))
                         index.unique = True
                         index.exclude_nulls = True
         result = super( DB2DDLCompiler, self ).create_table_constraints(table, **kw)
@@ -559,17 +558,16 @@ class DB2DDLCompiler(compiler.DDLCompiler):
     def visit_add_constraint(self, create):
         if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
             if isinstance(create.element, sa_schema.UniqueConstraint):
-                columns = [create.element.columns.get(key) for key in create.element.columns.keys()]
-                for column in columns:
+                for column in create.element:
                     if column.nullable:
                         create.element.exclude_nulls = True
                         break
                 if getattr(create.element, 'exclude_nulls', None):
                     if not create.element.name:
-                        index_name = "%s_%s_%s" % ('uk_index', self.preparer.format_table(create.element.table), '_'.join(column.name for column in columns))
+                        index_name = "%s_%s_%s" % ('uk_index', self.preparer.format_table(create.element.table), '_'.join(column.name for column in create.element))
                     else:
                         index_name = create.element.name
-                    index = sa_schema.Index(index_name, *(column for column in columns))
+                    index = sa_schema.Index(index_name, *(column for column in create.element))
                     index.unique = True
                     index.exclude_nulls = True
                     sql = self.visit_create_index(sa_schema.CreateIndex(index)) 
