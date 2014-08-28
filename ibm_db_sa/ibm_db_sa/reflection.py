@@ -305,6 +305,47 @@ class DB2Reflector(BaseReflector):
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return [value for key, value in fschema.iteritems()]
+        
+    def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
+        default_schema = self.default_schema_name
+        current_schema = self.denormalize_name(schema or default_schema)
+        default_schema = self.normalize_name(default_schema)
+        table_name = self.denormalize_name(table_name)
+        sysfkeys = self.sys_foreignkeys
+        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
+                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
+                            sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
+                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
+            sql.and_(
+              sysfkeys.c.pktabschema == current_schema,
+              sysfkeys.c.pktabname == table_name
+            ),
+            order_by=[sysfkeys.c.colno]
+          )
+
+        fschema = {}
+        for r in connection.execute(query):
+            if not fschema.has_key(r[0]):
+                constrained_schema = self.normalize_name(r[1])
+
+                # if no schema specified and referred schema here is the
+                # default, then set to None
+                if schema is None and \
+                    constrained_schema == default_schema:
+                    constrained_schema = None
+
+                fschema[r[0]] = {
+                    'name': self.normalize_name(r[0]),
+                    'constrained_schema': constrained_schema,
+                    'constrained_table': self.normalize_name(r[2]),
+                    'constrained_columns': [self.normalize_name(r[3])],
+                    'referred_schema': schema,
+                    'referred_table': self.normalize_name(r[6]),
+                    'referred_columns': [self.normalize_name(r[7])]}
+            else:
+                fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
+                fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
+        return [value for key, value in fschema.iteritems()]
 
 
     @reflection.cache
