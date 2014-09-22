@@ -102,6 +102,20 @@ class DB2Reflector(BaseReflector):
       Column("COLNAMES", CoerceUnicode, key="colnames"),
       Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
       schema="SYSCAT")
+    
+    sys_tabconst = Table("TABCONST", ischema,
+      Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
+      Column("TABNAME", CoerceUnicode, key="tabname"),
+      Column("CONSTNAME", CoerceUnicode, key="constname"),
+      Column("TYPE", CoerceUnicode, key="type"),
+      schema="SYSCAT")
+    
+    sys_keycoluse = Table("KEYCOLUSE", ischema,
+      Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
+      Column("TABNAME", CoerceUnicode, key="tabname"),
+      Column("CONSTNAME", CoerceUnicode, key="constname"),
+      Column("COLNAME", CoerceUnicode, key="colname"),
+      schema="SYSCAT")
 
     sys_foreignkeys = Table("SQLFOREIGNKEYS", ischema,
       Column("FK_NAME", CoerceUnicode, key="fkname"),
@@ -371,6 +385,34 @@ class DB2Reflector(BaseReflector):
                         'unique': r[2] == 'U'
                     })
         return indexes
+    
+    @reflection.cache
+    def get_unique_constraints(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        syskeycol = self.sys_keycoluse
+        sysconst = self.sys_tabconst
+        query = sql.select([syskeycol.c.constname, syskeycol.c.colname],
+            sql.and_(
+              syskeycol.c.constname == sysconst.c.constname,
+              sysconst.c.tabname == table_name,
+              sysconst.c.tabschema == current_schema,
+              sysconst.c.type == 'U'
+            ),
+            order_by=[syskeycol.c.constname]
+          )
+        uniqueConsts = []
+        currConst = None
+        for r in connection.execute(query):
+            if currConst == r[0]:
+                uniqueConsts[-1]['column_names'].append(self.normalize_name(r[1]))
+            else:
+                currConst = r[0]
+                uniqueConsts.append({
+                        'name': self.normalize_name(currConst),
+                        'column_names': [self.normalize_name(r[1])],
+                    })
+        return uniqueConsts
 
 class AS400Reflector(BaseReflector):
 

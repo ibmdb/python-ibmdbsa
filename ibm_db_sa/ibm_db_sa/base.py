@@ -707,9 +707,17 @@ class DB2Dialect(default.DefaultDialect):
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
         return self._reflector.get_foreign_keys(
                                 connection, table_name, schema=schema, **kw)
+        
+    def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
+        return self._reflector.get_incoming_foreign_keys(
+                                connection, table_name, schema=schema, **kw)
 
     def get_indexes(self, connection, table_name, schema=None, **kw):
         return self._reflector.get_indexes(
+                                connection, table_name, schema=schema, **kw)
+        
+    def get_unique_constraints(self, connection, table_name, schema=None, **kw):
+        return self._reflector.get_unique_constraints(
                                 connection, table_name, schema=schema, **kw)
 
 
