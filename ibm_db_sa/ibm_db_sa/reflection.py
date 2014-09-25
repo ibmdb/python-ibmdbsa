@@ -101,6 +101,7 @@ class DB2Reflector(BaseReflector):
       Column("INDNAME", CoerceUnicode, key="indname"),
       Column("COLNAMES", CoerceUnicode, key="colnames"),
       Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
+      Column("SYSTEM_REQUIRED", CoerceUnicode, key="system_required"),
       schema="SYSCAT")
     
     sys_tabconst = Table("TABCONST", ischema,
@@ -367,7 +368,7 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
-        query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule],
+        query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule, sysidx.c.system_required],
             sql.and_(
               sysidx.c.tabschema == current_schema,
               sysidx.c.tabname == table_name
@@ -378,6 +379,8 @@ class DB2Reflector(BaseReflector):
         col_finder = re.compile("(\w+)")
         for r in connection.execute(query):
             if r[2] != 'P':
+                if r[2] == 'U' and r[3] != 0:
+                    continue
                 indexes.append({
                         'name': self.normalize_name(r[0]),
                         'column_names': [self.normalize_name(col)
