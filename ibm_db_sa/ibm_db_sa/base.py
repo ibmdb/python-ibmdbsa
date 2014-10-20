@@ -105,7 +105,7 @@ RESERVED_WORDS = set(
     'unnest', 'element', 'percentile_disc', 'upper', 'exec', 'power', 'var_pop', 'exp',
     'real', 'var_samp', 'false', 'recursive', 'varchar', 'filter', 'ref', 'varying',
     'float', 'regr_avgx', 'width_bucket', 'floor', 'regr_avgy', 'window', 'fusion',
-    'regr_count', 'within'])
+    'regr_count', 'within', 'asc'])
 
 
 class _IBM_Boolean(sa_types.Boolean):

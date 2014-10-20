@@ -320,7 +320,8 @@ class DB2Reflector(BaseReflector):
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return [value for key, value in fschema.iteritems()]
-        
+    
+    @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
         current_schema = self.denormalize_name(schema or default_schema)

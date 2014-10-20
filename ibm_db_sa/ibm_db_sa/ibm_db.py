@@ -80,7 +80,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
     supports_sane_multi_rowcount = False
     supports_native_decimal = False
     supports_char_length = True
-    supports_default_values = True
+    supports_default_values = False
     supports_multivalues_insert = True
     execution_ctx_cls = DB2ExecutionContext_ibm_db
 

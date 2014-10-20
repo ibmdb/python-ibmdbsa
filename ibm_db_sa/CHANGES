@@ -1,5 +1,13 @@
 CHANGES
 =======
+2014/10/20 (IBM_DB_SA adaptor 0.3.2)
+- Added SSL support
+- Added get_incoming_foreign_keys functionality with reflector 
+- Added get_unique_constraints reflection feature 
+- Added exist() unary operator support within select clause 
+- Fixed incompatible issue of sql.true() for SQLAlchemy v0.7.x & 0.8.x 
+- Fixed add_constraint incompatible issue with SQLAlchemy-0.9.x
+- Fixed reflection function get_indexes to not return the unique constraint participating index 
 
 2014/03/26 (IBM_DB_SA adapter 0.3.1)
 - Handle Double Type in DDL Generator
