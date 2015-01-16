@@ -157,10 +157,12 @@ class DB2Dialect_ibm_db(DB2Dialect):
     def is_disconnect(self, ex, connection, cursor):
         if isinstance(ex, (self.dbapi.ProgrammingError,
                                              self.dbapi.OperationalError)):
-            return 'Connection is not active' in str(ex) or \
-                        'connection is no longer active' in str(ex) or \
-                        'Connection Resource cannot be found' in str(ex) or \
-                        'SQL30081N' in str(ex)
+            connection_errors = ('Connection is not active', 'connection is no longer active',
+                                    'Connection Resource cannot be found', 'SQL30081N'
+                                    'CLI0108E', 'CLI0106E', 'SQL1224N')
+            for err_msg in connection_errors:
+                if err_msg in str(ex):
+                    return True
         else:
             return False
 
