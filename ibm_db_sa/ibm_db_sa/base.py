@@ -474,6 +474,22 @@ class DB2Compiler(compiler.SQLCompiler):
             return super(DB2Compiler, self).visit_unary(unary, **kw)
 
 class DB2DDLCompiler(compiler.DDLCompiler):
+    
+    def get_server_version_info(self, dialect):
+        """Returns the DB2 server major and minor version as a list of ints."""
+        if hasattr(dialect, 'dbms_ver'):
+            return [int(ver_token) for ver_token in dialect.dbms_ver.split('.')[0:2]]
+        else:
+            return []
+    
+    def _is_nullable_unique_constraint_supported(self, dialect):
+        """Checks to see if the DB2 version is at least 10.5.
+        This is needed for checking if unique constraints with null columns are supported.
+        """
+        if hasattr(dialect, 'dbms_name') and (dialect.dbms_name.find('DB2/') != -1):
+            return self.get_server_version_info(dialect) >= [10, 5]
+        else:
+            return False
 
     def get_column_specification(self, column, **kw):
         col_spec = [self.preparer.format_column(column)]
@@ -512,37 +528,47 @@ class DB2DDLCompiler(compiler.DDLCompiler):
     def visit_drop_constraint(self, drop, **kw):
         constraint = drop.element
         if isinstance(constraint, sa_schema.ForeignKeyConstraint):
-                qual = "FOREIGN KEY "
-                const = self.preparer.format_constraint(constraint)
+            qual = "FOREIGN KEY "
+            const = self.preparer.format_constraint(constraint)
         elif isinstance(constraint, sa_schema.PrimaryKeyConstraint):
-                qual = "PRIMARY KEY "
-                const = ""
+            qual = "PRIMARY KEY "
+            const = ""
         elif isinstance(constraint, sa_schema.UniqueConstraint):
-                qual = "INDEX "
-                const = self.preparer.format_constraint(constraint)
+            qual = "UNIQUE "
+            if self._is_nullable_unique_constraint_supported(self.dialect):
+                for column in constraint:
+                    if column.nullable:
+                        constraint.uConstraint_as_index = True
+                if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
+                    qual = "INDEX "
+            const = self.preparer.format_constraint(constraint)
         else:
-                qual = ""
-                const = self.preparer.format_constraint(constraint)
+            qual = ""
+            const = self.preparer.format_constraint(constraint)
+            
+        if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
+            return "DROP %s%s" % \
+                                (qual, const)
         return "ALTER TABLE %s DROP %s%s" % \
                                 (self.preparer.format_table(constraint.table),
                                 qual, const)
                                 
     def create_table_constraints(self, table, **kw):
-        if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
+        if self._is_nullable_unique_constraint_supported(self.dialect):
             for constraint in table._sorted_constraints:
                 if isinstance(constraint, sa_schema.UniqueConstraint):
                     for column in constraint:
                         if column.nullable:
-                            constraint.use_alter = True
+                            constraint.uConstraint_as_index = True
                             break
-                    if hasattr(constraint, 'use_alter') and constraint.use_alter:
+                    if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
                         if not constraint.name:
                             index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table), '_'.join(column.name for column in constraint))
                         else:
                             index_name = constraint.name
                         index = sa_schema.Index(index_name, *(column for column in constraint))
                         index.unique = True
-                        index.exclude_nulls = True
+                        index.uConstraint_as_index = True
         result = super( DB2DDLCompiler, self ).create_table_constraints(table, **kw)
         return result
     
@@ -551,25 +577,25 @@ class DB2DDLCompiler(compiler.DDLCompiler):
             sql = super( DB2DDLCompiler, self ).visit_create_index(create)
         else:
             sql = super( DB2DDLCompiler, self ).visit_create_index(create, include_schema, include_table_schema)
-        if getattr(create.element, 'exclude_nulls', None):
+        if getattr(create.element, 'uConstraint_as_index', None):
             sql += ' EXCLUDE NULL KEYS'
         return sql
 
     def visit_add_constraint(self, create):
-        if (self.dialect.dbms_name.find('DB2/') != -1) and ([long(ver_token) for ver_token in self.dialect.dbms_ver.split('.')[0:2]] >= [10, 5]):
+        if self._is_nullable_unique_constraint_supported(self.dialect):
             if isinstance(create.element, sa_schema.UniqueConstraint):
                 for column in create.element:
                     if column.nullable:
-                        create.element.exclude_nulls = True
+                        create.element.uConstraint_as_index = True
                         break
-                if getattr(create.element, 'exclude_nulls', None):
+                if getattr(create.element, 'uConstraint_as_index', None):
                     if not create.element.name:
                         index_name = "%s_%s_%s" % ('uk_index', self.preparer.format_table(create.element.table), '_'.join(column.name for column in create.element))
                     else:
                         index_name = create.element.name
                     index = sa_schema.Index(index_name, *(column for column in create.element))
                     index.unique = True
-                    index.exclude_nulls = True
+                    index.uConstraint_as_index = True
                     sql = self.visit_create_index(sa_schema.CreateIndex(index)) 
                     return sql
         sql = super( DB2DDLCompiler, self ).visit_add_constraint(create)
