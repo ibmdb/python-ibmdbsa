@@ -539,7 +539,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                 for column in constraint:
                     if column.nullable:
                         constraint.uConstraint_as_index = True
-                if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
+                if getattr(constraint, 'uConstraint_as_index', None):
                     qual = "INDEX "
             const = self.preparer.format_constraint(constraint)
         else:
@@ -559,9 +559,10 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                 if isinstance(constraint, sa_schema.UniqueConstraint):
                     for column in constraint:
                         if column.nullable:
+                            constraint.use_alter = True
                             constraint.uConstraint_as_index = True
                             break
-                    if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
+                    if getattr(constraint, 'uConstraint_as_index', None):
                         if not constraint.name:
                             index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table), '_'.join(column.name for column in constraint))
                         else:
