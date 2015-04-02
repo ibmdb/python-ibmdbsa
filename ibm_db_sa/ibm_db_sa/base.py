@@ -325,6 +325,9 @@ class DB2Compiler(compiler.SQLCompiler):
         def visit_true(self, expr, **kw):
             return '1'
             
+    def get_cte_preamble(self, recursive):
+        return "WITH"
+        
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
 
