@@ -20,6 +20,7 @@
 from .base import DB2ExecutionContext, DB2Dialect
 from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
+from sqlalchemy.exc import ArgumentError
 SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 if SA_Version < [0, 8]:
@@ -107,7 +108,40 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
-
+        
+    _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
+                             'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
+   
+    def set_isolation_level(self, connection, level):    
+        if level is  None:
+         level ='CS' 
+        else :
+          if len(level.strip()) < 1:
+            level ='CS'
+        level.upper().replace("-", " ")   
+        if level not in self._isolation_lookup:
+            raise ArgumentError(
+                "Invalid value '%s' for isolation_level. "
+                "Valid isolation levels for %s are %s" %
+                (level, self.name, ", ".join(self._isolation_lookup))
+            )
+        cursor = connection.cursor()
+        cursor.execute("SET CURRENT ISOLATION %s" % level)
+        cursor.execute("COMMIT")
+        cursor.close()
+        
+    def get_isolation_level(self, connection):
+        cursor = connection.cursor()
+        cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
+        val = cursor.fetchone()[0]
+        cursor.close()
+        if util.py3k and isinstance(val, bytes):
+            val = val.decode()
+        return val
+    
+    def reset_isolation_level(self, connection):
+        self.set_isolation_level(connection,'CS')
+        
     def create_connect_args(self, url):
         # DSN support through CLI configuration (../cfg/db2cli.ini),
         # while 2 connection attributes are mandatory: database alias
