@@ -115,14 +115,14 @@ class DB2Reflector(BaseReflector):
       Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
       Column("SYSTEM_REQUIRED", CoerceUnicode, key="system_required"),
       schema="SYSCAT")
-    
+
     sys_tabconst = Table("TABCONST", ischema,
       Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
       Column("TABNAME", CoerceUnicode, key="tabname"),
       Column("CONSTNAME", CoerceUnicode, key="constname"),
       Column("TYPE", CoerceUnicode, key="type"),
       schema="SYSCAT")
-    
+
     sys_keycoluse = Table("KEYCOLUSE", ischema,
       Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
       Column("TABNAME", CoerceUnicode, key="tabname"),
@@ -242,12 +242,9 @@ class DB2Reflector(BaseReflector):
                             syscols.c.defaultval, syscols.c.nullable,
                             syscols.c.length, syscols.c.scale,
                             syscols.c.identity, syscols.c.generated],
-              sql.and_(
-                  syscols.c.tabschema == current_schema,
-                  syscols.c.tabname == table_name
-                ),
-              order_by=[syscols.c.colno]
-            )
+                           sql.and_(syscols.c.tabschema == current_schema,
+                                    syscols.c.tabname == table_name),
+                           order_by=[syscols.c.colno])
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
@@ -262,13 +259,11 @@ class DB2Reflector(BaseReflector):
                     util.warn("Did not recognize type '%s' of column '%s'" % (coltype, r[0]))
                     coltype = sa_types.NULLTYPE
 
-            sa_columns.append({
-                    'name': self.normalize_name(r[0]),
-                    'type': coltype,
-                    'nullable': r[3] == 'Y',
-                    'default': r[2] or None,
-                    'autoincrement': (r[6] == 'Y') and (r[7] != ' '),
-                })
+            sa_columns.append({'name': self.normalize_name(r[0]),
+                               'type': coltype,
+                               'nullable': r[3] == 'Y',
+                               'default': r[2] or None,
+                               'autoincrement': (r[6] == 'Y') and (r[7] != ' ')})
         return sa_columns
 
     @reflection.cache
@@ -276,15 +271,12 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_indexes
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         query = sql.select([sysindexes.c.colnames],
-              sql.and_(
-                  sysindexes.c.tabschema == current_schema,
-                  sysindexes.c.tabname == table_name,
-                  sysindexes.c.uniquerule == 'P'
-                ),
-              order_by=[sysindexes.c.tabschema, sysindexes.c.tabname]
-            )
+                           sql.and_(sysindexes.c.tabschema == current_schema,
+                                    sysindexes.c.tabname == table_name,
+                                    sysindexes.c.uniquerule == 'P'),
+                           order_by=[sysindexes.c.tabschema, sysindexes.c.tabname])
         pk_columns = []
         for r in connection.execute(query):
             cols = col_finder.findall(r[0])
@@ -302,12 +294,9 @@ class DB2Reflector(BaseReflector):
                             sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
                             sysfkeys.c.pkname, sysfkeys.c.pktabschema,
                             sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
-            sql.and_(
-              sysfkeys.c.fktabschema == current_schema,
-              sysfkeys.c.fktabname == table_name
-            ),
-            order_by=[sysfkeys.c.colno]
-          )
+                           sql.and_(sysfkeys.c.fktabschema == current_schema,
+                                    sysfkeys.c.fktabname == table_name),
+                           order_by=[sysfkeys.c.colno])
 
         fschema = {}
         for r in connection.execute(query):
@@ -319,17 +308,16 @@ class DB2Reflector(BaseReflector):
                 if schema is None and referred_schema == default_schema:
                     referred_schema = None
 
-                fschema[r[0]] = {
-                    'name': self.normalize_name(r[0]),
-                    'constrained_columns': [self.normalize_name(r[3])],
-                    'referred_schema': referred_schema,
-                    'referred_table': self.normalize_name(r[6]),
-                    'referred_columns': [self.normalize_name(r[7])]}
+                fschema[r[0]] = {'name': self.normalize_name(r[0]),
+                                 'constrained_columns': [self.normalize_name(r[3])],
+                                 'referred_schema': referred_schema,
+                                 'referred_table': self.normalize_name(r[6]),
+                                 'referred_columns': [self.normalize_name(r[7])]}
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return fschema.values()
-    
+
     @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
@@ -341,12 +329,9 @@ class DB2Reflector(BaseReflector):
                             sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
                             sysfkeys.c.pkname, sysfkeys.c.pktabschema,
                             sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
-            sql.and_(
-              sysfkeys.c.pktabschema == current_schema,
-              sysfkeys.c.pktabname == table_name
-            ),
-            order_by=[sysfkeys.c.colno]
-          )
+                           sql.and_(sysfkeys.c.pktabschema == current_schema,
+                                    sysfkeys.c.pktabname == table_name),
+                           order_by=[sysfkeys.c.colno])
 
         fschema = {}
         for r in connection.execute(query):
@@ -355,18 +340,16 @@ class DB2Reflector(BaseReflector):
 
                 # if no schema specified and referred schema here is the
                 # default, then set to None
-                if schema is None and \
-                    constrained_schema == default_schema:
+                if schema is None and constrained_schema == default_schema:
                     constrained_schema = None
 
-                fschema[r[0]] = {
-                    'name': self.normalize_name(r[0]),
-                    'constrained_schema': constrained_schema,
-                    'constrained_table': self.normalize_name(r[2]),
-                    'constrained_columns': [self.normalize_name(r[3])],
-                    'referred_schema': schema,
-                    'referred_table': self.normalize_name(r[6]),
-                    'referred_columns': [self.normalize_name(r[7])]}
+                fschema[r[0]] = {'name': self.normalize_name(r[0]),
+                                 'constrained_schema': constrained_schema,
+                                 'constrained_table': self.normalize_name(r[2]),
+                                 'constrained_columns': [self.normalize_name(r[3])],
+                                 'referred_schema': schema,
+                                 'referred_table': self.normalize_name(r[6]),
+                                 'referred_columns': [self.normalize_name(r[7])]}
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
@@ -379,26 +362,21 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
         query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule, sysidx.c.system_required],
-            sql.and_(
-              sysidx.c.tabschema == current_schema,
-              sysidx.c.tabname == table_name
-            ),
-            order_by=[sysidx.c.tabname]
-          )
+                           sql.and_(sysidx.c.tabschema == current_schema,
+                                    sysidx.c.tabname == table_name),
+                           order_by=[sysidx.c.tabname])
         indexes = []
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         for r in connection.execute(query):
             if r[2] != 'P':
                 if r[2] == 'U' and r[3] != 0:
                     continue
-                indexes.append({
-                        'name': self.normalize_name(r[0]),
-                        'column_names': [self.normalize_name(col)
-                                        for col in col_finder.findall(r[1])],
-                        'unique': r[2] == 'U'
-                    })
+                indexes.append({'name': self.normalize_name(r[0]),
+                                'column_names': [self.normalize_name(col)
+                                                 for col in col_finder.findall(r[1])],
+                                'unique': r[2] == 'U'})
         return indexes
-    
+
     @reflection.cache
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
@@ -406,14 +384,11 @@ class DB2Reflector(BaseReflector):
         syskeycol = self.sys_keycoluse
         sysconst = self.sys_tabconst
         query = sql.select([syskeycol.c.constname, syskeycol.c.colname],
-            sql.and_(
-              syskeycol.c.constname == sysconst.c.constname,
-              sysconst.c.tabname == table_name,
-              sysconst.c.tabschema == current_schema,
-              sysconst.c.type == 'U'
-            ),
-            order_by=[syskeycol.c.constname]
-          )
+                           sql.and_(syskeycol.c.constname == sysconst.c.constname,
+                                    sysconst.c.tabname == table_name,
+                                    sysconst.c.tabschema == current_schema,
+                                    sysconst.c.type == 'U'),
+                           order_by=[syskeycol.c.constname])
         uniqueConsts = []
         currConst = None
         for r in connection.execute(query):
@@ -421,10 +396,8 @@ class DB2Reflector(BaseReflector):
                 uniqueConsts[-1]['column_names'].append(self.normalize_name(r[1]))
             else:
                 currConst = r[0]
-                uniqueConsts.append({
-                        'name': self.normalize_name(currConst),
-                        'column_names': [self.normalize_name(r[1])],
-                    })
+                uniqueConsts.append({'name': self.normalize_name(currConst),
+                                     'column_names': [self.normalize_name(r[1])]})
         return uniqueConsts
 
 class AS400Reflector(BaseReflector):
@@ -517,11 +490,10 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         if current_schema:
-                whereclause = sql.and_(
-                            self.sys_tables.c.tabschema == current_schema,
-                            self.sys_tables.c.tabname == table_name)
+            whereclause = sql.and_(self.sys_tables.c.tabschema == current_schema,
+                                   self.sys_tables.c.tabname == table_name)
         else:
-                whereclause = self.sys_tables.c.tabname == table_name
+            whereclause = self.sys_tables.c.tabname == table_name
         s = sql.select([self.sys_tables], whereclause)
         c = connection.execute(s)
         return c.first() is not None
@@ -530,11 +502,10 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         sequence_name = self.denormalize_name(sequence_name)
         if current_schema:
-                whereclause = sql.and_(
-                            self.sys_sequences.c.seqschema == current_schema,
-                            self.sys_sequences.c.seqname == sequence_name)
+            whereclause = sql.and_(self.sys_sequences.c.seqschema == current_schema,
+                                   self.sys_sequences.c.seqname == sequence_name)
         else:
-                whereclause = self.sys_sequences.c.seqname == sequence_name
+            whereclause = self.sys_sequences.c.seqname == sequence_name
         s = sql.select([self.sys_sequences.c.seqname], whereclause)
         c = connection.execute(s)
         return c.first() is not None
@@ -543,10 +514,9 @@ class AS400Reflector(BaseReflector):
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_schemas
         query = sql.select([sysschema.c.schemaname],
-                sql.not_(sysschema.c.schemaname.like('SYS%')),
-                sql.not_(sysschema.c.schemaname.like('Q%')),
-                order_by=[sysschema.c.schemaname]
-        )
+                           sql.not_(sysschema.c.schemaname.like('SYS%')),
+                           sql.not_(sysschema.c.schemaname.like('Q%')),
+                           order_by=[sysschema.c.schemaname])
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     # Retrieves a list of table names for a given schema
@@ -565,9 +535,8 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
 
         query = sql.select([self.sys_views.c.viewname],
-                self.sys_views.c.viewschema == current_schema,
-                order_by=[self.sys_views.c.viewname]
-            )
+                           self.sys_views.c.viewschema == current_schema,
+                           order_by=[self.sys_views.c.viewname])
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -576,9 +545,8 @@ class AS400Reflector(BaseReflector):
         viewname = self.denormalize_name(viewname)
 
         query = sql.select([self.sys_views.c.text],
-                self.sys_views.c.viewschema == current_schema,
-                self.sys_views.c.viewname == viewname
-            )
+                           self.sys_views.c.viewschema == current_schema,
+                           self.sys_views.c.viewname == viewname)
         return connection.execute(query).scalar()
 
     @reflection.cache
@@ -588,16 +556,13 @@ class AS400Reflector(BaseReflector):
         syscols = self.sys_columns
 
         query = sql.select([syscols.c.colname,
-                                syscols.c.typename,
-                                syscols.c.defaultval, syscols.c.nullable,
-                                syscols.c.length, syscols.c.scale,
-                                syscols.c.isid, syscols.c.idgenerate],
-                    sql.and_(
-                            syscols.c.tabschema == current_schema,
-                            syscols.c.tabname == table_name
-                        ),
-                    order_by=[syscols.c.colno]
-                )
+                            syscols.c.typename,
+                            syscols.c.defaultval, syscols.c.nullable,
+                            syscols.c.length, syscols.c.scale,
+                            syscols.c.isid, syscols.c.idgenerate],
+                           sql.and_(syscols.c.tabschema == current_schema,
+                                    syscols.c.tabname == table_name),
+                           order_by=[syscols.c.colno])
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
@@ -612,12 +577,11 @@ class AS400Reflector(BaseReflector):
                     util.warn("Did not recognize type '%s' of column '%s'" % (coltype, r[0]))
                     coltype = sa_types.NULLTYPE
 
-            sa_columns.append({
-                    'name': self.normalize_name(r[0]),
-                    'type': coltype,
-                    'nullable': r[3] == 'Y',
-                    'default': r[2],
-                    'autoincrement': (r[6] == 'YES') and (r[7] is not None)})
+            sa_columns.append({'name': self.normalize_name(r[0]),
+                               'type': coltype,
+                               'nullable': r[3] == 'Y',
+                               'default': r[2],
+                               'autoincrement': (r[6] == 'YES') and (r[7] is not None)})
         return sa_columns
 
     @reflection.cache
@@ -628,13 +592,12 @@ class AS400Reflector(BaseReflector):
         syskeyconst = self.sys_key_constraints
 
         query = sql.select([syskeyconst.c.colname, sysconst.c.tabname],
-                sql.and_(
-                    syskeyconst.c.conschema == sysconst.c.conschema,
-                    syskeyconst.c.conname == sysconst.c.conname,
-                    sysconst.c.tabschema == current_schema,
-                    sysconst.c.tabname == table_name,
-                    sysconst.c.contype == 'PRIMARY KEY'
-            ), order_by=[syskeyconst.c.colno])
+                           sql.and_(syskeyconst.c.conschema == sysconst.c.conschema,
+                                    syskeyconst.c.conname == sysconst.c.conname,
+                                    sysconst.c.tabschema == current_schema,
+                                    sysconst.c.tabname == table_name,
+                                    sysconst.c.contype == 'PRIMARY KEY'),
+                           order_by=[syskeyconst.c.colno])
 
         return [self.normalize_name(key[0]) for key in connection.execute(query)]
 
@@ -649,12 +612,9 @@ class AS400Reflector(BaseReflector):
                             sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
                             sysfkeys.c.pkname, sysfkeys.c.pktabschema,
                             sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
-                sql.and_(
-                    sysfkeys.c.fktabschema == current_schema,
-                    sysfkeys.c.fktabname == table_name
-                ),
-                order_by=[sysfkeys.c.colno]
-            )
+                           sql.and_(sysfkeys.c.fktabschema == current_schema,
+                                    sysfkeys.c.fktabname == table_name),
+                           order_by=[sysfkeys.c.colno])
         fschema = {}
         for r in connection.execute(query):
             if r[0] not in fschema:

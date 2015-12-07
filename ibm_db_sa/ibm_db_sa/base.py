@@ -317,13 +317,13 @@ class DB2Compiler(compiler.SQLCompiler):
     if SA_Version < [0, 9]:
         def visit_false(self, expr, **kw):
             return '0'
-            
+
         def visit_true(self, expr, **kw):
             return '1'
-            
+
     def get_cte_preamble(self, recursive):
         return "WITH"
-        
+
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
 
@@ -350,8 +350,8 @@ class DB2Compiler(compiler.SQLCompiler):
         sql_ori = compiler.SQLCompiler.visit_select(self, select, **kwargs)
         if offset is not None:
             __rownum = 'Z.__ROWNUM'
-            sql_split = re.split("[\s+]FROM ", sql_ori, 1)
-            sql_sec = " \nFROM %s " % ( sql_split[1] )
+            sql_split = re.split(r"[\s+]FROM ", sql_ori, 1)
+            sql_sec = " \nFROM %s " % (sql_split[1],)
 
             dummyVal = "Z.__db2_"
             sql_pri = ""
@@ -360,44 +360,43 @@ class DB2Compiler(compiler.SQLCompiler):
             if select._distinct:
                 sql_sel = "SELECT DISTINCT "
 
-            sql_select_token = sql_split[0].split( "," )
+            sql_select_token = sql_split[0].split(",")
             i = 0
             while i < len(sql_select_token):
-                if sql_select_token[i].count( "TIMESTAMP(DATE(SUBSTR(CHAR(" ) == 1:
-                    sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
-                    sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % (
-                                    sql_pri,
-                                    sql_select_token[i],
-                                    sql_select_token[i + 1],
-                                    sql_select_token[i + 2],
-                                    sql_select_token[i + 3],
-                                    dummyVal, i + 1 )
+                if sql_select_token[i].count("TIMESTAMP(DATE(SUBSTR(CHAR(") == 1:
+                    sql_sel = "%s \"%s%d\"," % (sql_sel, dummyVal, i + 1)
+                    sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % (sql_pri,
+                                                             sql_select_token[i],
+                                                             sql_select_token[i + 1],
+                                                             sql_select_token[i + 2],
+                                                             sql_select_token[i + 3],
+                                                             dummyVal, i + 1)
                     i += 4
                     continue
 
-                if sql_select_token[i].count( " AS " ) == 1:
-                    temp_col_alias = sql_select_token[i].split( " AS " )
-                    sql_pri = '%s %s,' % ( sql_pri, sql_select_token[i] )
-                    sql_sel = "%s %s," % ( sql_sel, temp_col_alias[1] )
+                if sql_select_token[i].count(" AS ") == 1:
+                    temp_col_alias = sql_select_token[i].split(" AS ")
+                    sql_pri = '%s %s,' % (sql_pri, sql_select_token[i])
+                    sql_sel = "%s %s," % (sql_sel, temp_col_alias[1])
                     i += 1
                     continue
 
-                sql_pri = '%s %s AS "%s%d",' % ( sql_pri, sql_select_token[i], dummyVal, i + 1 )
-                sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
+                sql_pri = '%s %s AS "%s%d",' % (sql_pri, sql_select_token[i], dummyVal, i + 1)
+                sql_sel = "%s \"%s%d\"," % (sql_sel, dummyVal, i + 1)
                 i += 1
 
-            sql_pri = sql_pri[:len( sql_pri ) - 1]
-            sql_pri = "%s%s" % ( sql_pri, sql_sec )
-            sql_sel = sql_sel[:len( sql_sel ) - 1]
-            sql = '%s, ( ROW_NUMBER() OVER() ) AS "%s" FROM ( %s ) AS M' % ( sql_sel, __rownum, sql_pri )
-            sql = '%s FROM ( %s ) Z WHERE' % ( sql_sel, sql )
+            sql_pri = sql_pri[:len(sql_pri) - 1]
+            sql_pri = "%s%s" % (sql_pri, sql_sec)
+            sql_sel = sql_sel[:len(sql_sel) - 1]
+            sql = '%s, ( ROW_NUMBER() OVER() ) AS "%s" FROM ( %s ) AS M' % (sql_sel, __rownum, sql_pri)
+            sql = '%s FROM ( %s ) Z WHERE' % (sql_sel, sql)
 
             if offset is not 0:
-                sql = '%s "%s" > %d' % ( sql, __rownum, offset )
+                sql = '%s "%s" > %d' % (sql, __rownum, offset)
             if offset is not 0 and limit is not None:
                 sql = '%s AND ' % (sql,)
             if limit is not None:
-                sql = '%s "%s" <= %d' % ( sql, __rownum, offset + limit )
+                sql = '%s "%s" <= %d' % (sql, __rownum, offset + limit)
             return "( %s )" % (sql,)
         else:
             return sql_ori
@@ -447,12 +446,11 @@ class DB2Compiler(compiler.SQLCompiler):
     def visit_join(self, join, asfrom=False, **kwargs):
         # NOTE: this is the same method as that used in mysql/base.py
         # to render INNER JOIN
-        return ''.join(
-            (self.process(join.left, asfrom=True, **kwargs),
-             (join.isouter and " LEFT OUTER JOIN " or " INNER JOIN "),
-             self.process(join.right, asfrom=True, **kwargs),
-             " ON ",
-             self.process(join.onclause, **kwargs)))
+        return ''.join((self.process(join.left, asfrom=True, **kwargs),
+                        (join.isouter and " LEFT OUTER JOIN " or " INNER JOIN "),
+                        self.process(join.right, asfrom=True, **kwargs),
+                        " ON ",
+                        self.process(join.onclause, **kwargs)))
 
     def visit_savepoint(self, savepoint_stmt):
         return "SAVEPOINT %s ON ROLLBACK RETAIN CURSORS" % self.preparer.format_savepoint(savepoint_stmt)
@@ -462,7 +460,7 @@ class DB2Compiler(compiler.SQLCompiler):
 
     def visit_release_savepoint(self, savepoint_stmt):
         return 'RELEASE TO SAVEPOINT %s'% self.preparer.format_savepoint(savepoint_stmt)
-    
+
     def visit_unary(self, unary, **kw):
         if unary.operator == operators.exists and kw.get('within_columns_clause', False):
             usql = super(DB2Compiler, self).visit_unary(unary, **kw)
@@ -473,7 +471,7 @@ class DB2Compiler(compiler.SQLCompiler):
 
 
 class DB2DDLCompiler(compiler.DDLCompiler):
-    
+
     def get_server_version_info(self, dialect):
         """
         Returns the DB2 server major and minor version as a list of ints.
@@ -547,7 +545,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         else:
             qual = ""
             const = self.preparer.format_constraint(constraint)
-            
+
         if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
             return "DROP %s%s" % (qual, const)
 
@@ -572,15 +570,15 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                         index = sa_schema.Index(index_name, *(column for column in constraint))
                         index.unique = True
                         index.uConstraint_as_index = True
-        result = super( DB2DDLCompiler, self ).create_table_constraints(table, **kw)
+        result = super(DB2DDLCompiler, self).create_table_constraints(table, **kw)
         return result
 
 
     def visit_create_index(self, create, include_schema=True, include_table_schema=True):
         if SA_Version < [0, 8]:
-            sql = super( DB2DDLCompiler, self ).visit_create_index(create)
+            sql = super(DB2DDLCompiler, self).visit_create_index(create)
         else:
-            sql = super( DB2DDLCompiler, self ).visit_create_index(create, include_schema, include_table_schema)
+            sql = super(DB2DDLCompiler, self).visit_create_index(create, include_schema, include_table_schema)
         if getattr(create.element, 'uConstraint_as_index', None):
             sql += ' EXCLUDE NULL KEYS'
         return sql
@@ -602,9 +600,9 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                     index = sa_schema.Index(index_name, *(column for column in create.element))
                     index.unique = True
                     index.uConstraint_as_index = True
-                    sql = self.visit_create_index(sa_schema.CreateIndex(index)) 
+                    sql = self.visit_create_index(sa_schema.CreateIndex(index))
                     return sql
-        sql = super( DB2DDLCompiler, self ).visit_add_constraint(create)
+        sql = super(DB2DDLCompiler, self).visit_add_constraint(create)
         return sql
 
 
@@ -678,7 +676,7 @@ class DB2Dialect(default.DefaultDialect):
     supports_empty_insert = False
 
     two_phase_transactions = False
-    savepoints =  True
+    savepoints = True
 
     statement_compiler = DB2Compiler
     ddl_compiler = DB2DDLCompiler
@@ -698,7 +696,7 @@ class DB2Dialect(default.DefaultDialect):
         super(DB2Dialect, self).initialize(connection)
         self.dbms_ver = connection.connection.dbms_ver
         self.dbms_name = connection.connection.dbms_name
-        
+
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)
 
@@ -734,13 +732,13 @@ class DB2Dialect(default.DefaultDialect):
 
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
         return self._reflector.get_foreign_keys(connection, table_name, schema=schema, **kw)
-        
+
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
         return self._reflector.get_incoming_foreign_keys(connection, table_name, schema=schema, **kw)
 
     def get_indexes(self, connection, table_name, schema=None, **kw):
         return self._reflector.get_indexes(connection, table_name, schema=schema, **kw)
-        
+
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
         return self._reflector.get_unique_constraints(connection, table_name, schema=schema, **kw)
 

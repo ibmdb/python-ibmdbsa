@@ -61,7 +61,7 @@ class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
                 connectors = ['dsn=%s' % (keys.pop('host', '') or keys.pop('dsn', ''))]
             else:
                 port = ''
-                if 'port' in keys and not 'port' in query:
+                if 'port' in keys and 'port' not in query:
                     port = '%d' % int(keys.pop('port'))
 
                 database = keys.pop('database', '')
@@ -141,7 +141,7 @@ class AS400Dialect_pyodbc(PyODBCConnector, DB2Dialect):
             if 'odbc_autotranslate' in keys:
                 connectors.append("AutoTranslate=%s" % keys.pop("odbc_autotranslate"))
 
-            connectors.extend(['%s=%s' % (k,v) for k,v in keys.items()])
-        return [[";".join (connectors)], connect_args]
+            connectors.extend(['%s=%s' % (k, v) for k, v in keys.items()])
+        return [[";".join(connectors)], connect_args]
 
 

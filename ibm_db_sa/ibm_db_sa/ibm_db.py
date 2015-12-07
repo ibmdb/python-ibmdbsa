@@ -109,18 +109,17 @@ class DB2Dialect_ibm_db(DB2Dialect):
         return connection.connection.server_info()
 
 
-    _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
-                             'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
-   
-    def set_isolation_level(self, connection, level):    
+    _isolation_lookup = set(['READ STABILITY', 'RS', 'UNCOMMITTED READ', 'UR',
+                             'CURSOR STABILITY', 'CS', 'REPEATABLE READ', 'RR'])
+
+    def set_isolation_level(self, connection, level):
         if level is None or len(level.strip()) < 1:
-            level ='CS'
+            level = 'CS'
         level = level.upper().replace("-", " ")
         if level not in self._isolation_lookup:
-            raise ArgumentError(
-                "Invalid value '%s' for isolation_level. "
-                "Valid isolation levels for %s are %s" %
-                (level, self.name, ", ".join(self._isolation_lookup)))
+            raise ArgumentError("Invalid value '%s' for isolation_level. "
+                                "Valid isolation levels for %s are %s" %
+                                (level, self.name, ", ".join(self._isolation_lookup)))
         cursor = connection.cursor()
         cursor.execute("SET CURRENT ISOLATION %s" % level)
         cursor.execute("COMMIT")
@@ -166,7 +165,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 dsn_param.append('UID=%s' % url.username)
             if url.password:
                 dsn_param.append('PWD=%s' % url.password)
-            
+
             #check for SSL arguments
             ssl_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash']
             query_keys = url.query.keys()
@@ -176,8 +175,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
                         dsn_param.append('%(ssl_key)s=%(value)s' % {'ssl_key': key, 'value': url.query[query_key]})
                         del url.query[query_key]
                         break
-                           
-            dsn = ';'.join(dsn_param)      
+
+            dsn = ';'.join(dsn_param)
             dsn += ';'
             return (dsn, url.username, '', '', ''), {}
 
