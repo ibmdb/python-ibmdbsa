@@ -98,10 +98,16 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
 
     def do_execute(self, cursor, statement, parameters, context=None):
+        if isinstance(statement, bytes):
+            statement = statement.decode(self.encoding)
+        # TODO is bytes parameter conversion really needed?  seems to work without it in py3
+        if parameters:
+            parameters = tuple(p.decode(self.encoding) if isinstance(p, bytes) else p for p in parameters)
         if context and context._out_parameters:
             statement = statement.split('(', 1)[0].split()[1]
             context._callproc_result = cursor.callproc(statement, parameters)
         else:
+            print("do_execute stmt: '{}' params: '{}'".format(statement, parameters))
             cursor.execute(statement, parameters)
 
 
