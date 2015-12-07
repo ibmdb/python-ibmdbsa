@@ -27,11 +27,14 @@
 # and not be local to zxjdbc here.
 
 from decimal import Decimal as _python_Decimal
-from sqlalchemy import sql, util
-from sqlalchemy import types as sa_types
+from sqlalchemy import util
 from sqlalchemy.connectors.zxJDBC import ZxJDBCConnector
 from .base import _SelectLastRowIDMixin, DB2Dialect, DB2ExecutionContext, DB2Compiler
 from . import reflection as ibm_reflection
+
+if util.py3k:
+    long = int
+
 
 class DB2ExecutionContext_zxjdbc(_SelectLastRowIDMixin, DB2ExecutionContext):
 
@@ -46,7 +49,6 @@ class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
     returns_unicode_strings = supports_unicode = False
     supports_sane_multi_rowcount = False
 
-    supports_unicode_statements = False
     supports_sane_rowcount = True
     supports_char_length = True
 

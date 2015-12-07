@@ -23,15 +23,26 @@ from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
 import re
 
+if util.py3k:
+    unicode = str
+
+def _bytes_to_unicode(val, encoding):
+    if hasattr(val, 'decode'):
+        return val.decode(encoding)
+    return val
+
+def _unicode_to_bytes(val, encoding):
+    if hasattr(val, 'encode'):
+        return val.encode(encoding)
+    return val
 
 
 class CoerceUnicode(sa_types.TypeDecorator):
     impl = sa_types.Unicode
 
     def process_bind_param(self, value, dialect):
-        if isinstance(value, str):
-            value = value.decode(dialect.encoding)
-        return value
+        return _bytes_to_unicode(value, dialect.encoding)
+
 
 class BaseReflector(object):
     def __init__(self, dialect):
@@ -40,9 +51,8 @@ class BaseReflector(object):
         self.identifier_preparer = dialect.identifier_preparer
 
     def normalize_name(self, name):
-        if isinstance(name, str):
-            name = name.decode(self.dialect.encoding)
-        if name != None:
+        name = _bytes_to_unicode(name, self.dialect.encoding)
+        if name is not None:
             return name.lower() if name.upper() == name and \
                not self.identifier_preparer._requires_quotes(name.lower()) \
                else name
@@ -55,15 +65,16 @@ class BaseReflector(object):
                 not self.identifier_preparer._requires_quotes(name.lower()):
             name = name.upper()
         if not self.dialect.supports_unicode_binds:
-            name = name.encode(self.dialect.encoding)
+            name = _unicode_to_bytes(name, self.dialect.encoding)
         else:
             name = unicode(name)
         return name
 
     def _get_default_schema_name(self, connection):
-        """Return: current setting of the schema attribute"""
-        default_schema_name = connection.execute(
-                    u'SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1').scalar()
+        """
+        Return: current setting of the schema attribute
+        """
+        default_schema_name = connection.execute(u'SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1').scalar()
         if isinstance(default_schema_name, str):
             default_schema_name = default_schema_name.strip()
         elif isinstance(default_schema_name, unicode):
@@ -73,6 +84,7 @@ class BaseReflector(object):
     @property
     def default_schema_name(self):
         return self.dialect.default_schema_name
+
 
 class DB2Reflector(BaseReflector):
     ischema = MetaData()
@@ -239,18 +251,16 @@ class DB2Reflector(BaseReflector):
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
-            if coltype in ['DECIMAL', 'NUMERIC']:
+            if coltype in ('DECIMAL', 'NUMERIC'):
                 coltype = self.ischema_names.get(coltype)(int(r[4]), int(r[5]))
-            elif coltype in ['CHARACTER', 'CHAR', 'VARCHAR',
-                            'GRAPHIC', 'VARGRAPHIC']:
+            elif coltype in ('CHARACTER', 'CHAR', 'VARCHAR', 'GRAPHIC', 'VARGRAPHIC'):
                 coltype = self.ischema_names.get(coltype)(int(r[4]))
             else:
                 try:
                     coltype = self.ischema_names[coltype]
                 except KeyError:
-                    util.warn("Did not recognize type '%s' of column '%s'" %
-                            (coltype, r[0]))
-                    coltype = coltype = sa_types.NULLTYPE
+                    util.warn("Did not recognize type '%s' of column '%s'" % (coltype, r[0]))
+                    coltype = sa_types.NULLTYPE
 
             sa_columns.append({
                     'name': self.normalize_name(r[0]),
@@ -288,9 +298,9 @@ class DB2Reflector(BaseReflector):
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
+        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                            sysfkeys.c.pkname, sysfkeys.c.pktabschema,
                             sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
             sql.and_(
               sysfkeys.c.fktabschema == current_schema,
@@ -301,13 +311,12 @@ class DB2Reflector(BaseReflector):
 
         fschema = {}
         for r in connection.execute(query):
-            if not fschema.has_key(r[0]):
+            if r[0] not in fschema:
                 referred_schema = self.normalize_name(r[5])
 
                 # if no schema specified and referred schema here is the
                 # default, then set to None
-                if schema is None and \
-                    referred_schema == default_schema:
+                if schema is None and referred_schema == default_schema:
                     referred_schema = None
 
                 fschema[r[0]] = {
@@ -319,7 +328,7 @@ class DB2Reflector(BaseReflector):
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
-        return [value for key, value in fschema.iteritems()]
+        return fschema.values()
     
     @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
@@ -328,9 +337,9 @@ class DB2Reflector(BaseReflector):
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
+        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                            sysfkeys.c.pkname, sysfkeys.c.pktabschema,
                             sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
             sql.and_(
               sysfkeys.c.pktabschema == current_schema,
@@ -341,7 +350,7 @@ class DB2Reflector(BaseReflector):
 
         fschema = {}
         for r in connection.execute(query):
-            if not fschema.has_key(r[0]):
+            if r[0] not in fschema:
                 constrained_schema = self.normalize_name(r[1])
 
                 # if no schema specified and referred schema here is the
@@ -361,7 +370,7 @@ class DB2Reflector(BaseReflector):
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
-        return [value for key, value in fschema.iteritems()]
+        return fschema.values()
 
 
     @reflection.cache
@@ -505,8 +514,7 @@ class AS400Reflector(BaseReflector):
       schema="QSYS2")
 
     def has_table(self, connection, table_name, schema=None):
-        current_schema = self.denormalize_name(
-                                schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         if current_schema:
                 whereclause = sql.and_(
@@ -519,8 +527,7 @@ class AS400Reflector(BaseReflector):
         return c.first() is not None
 
     def has_sequence(self, connection, sequence_name, schema=None):
-        current_schema = self.denormalize_name(
-                                schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
         sequence_name = self.denormalize_name(sequence_name)
         if current_schema:
                 whereclause = sql.and_(
@@ -555,8 +562,7 @@ class AS400Reflector(BaseReflector):
 
     @reflection.cache
     def get_view_names(self, connection, schema=None, **kw):
-        current_schema = self.denormalize_name(
-                                schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
 
         query = sql.select([self.sys_views.c.viewname],
                 self.sys_views.c.viewschema == current_schema,
@@ -566,8 +572,7 @@ class AS400Reflector(BaseReflector):
 
     @reflection.cache
     def get_view_definition(self, connection, viewname, schema=None, **kw):
-        current_schema = self.denormalize_name(
-                                schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
         viewname = self.denormalize_name(viewname)
 
         query = sql.select([self.sys_views.c.text],
@@ -596,32 +601,28 @@ class AS400Reflector(BaseReflector):
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
-            if coltype in ['DECIMAL', 'NUMERIC']:
+            if coltype in ('DECIMAL', 'NUMERIC'):
                 coltype = self.ischema_names.get(coltype)(int(r[4]), int(r[5]))
-            elif coltype in ['CHARACTER', 'CHAR', 'VARCHAR',
-                                'GRAPHIC', 'VARGRAPHIC']:
+            elif coltype in ('CHARACTER', 'CHAR', 'VARCHAR', 'GRAPHIC', 'VARGRAPHIC'):
                 coltype = self.ischema_names.get(coltype)(int(r[4]))
             else:
                 try:
                     coltype = self.ischema_names[coltype]
                 except KeyError:
-                    util.warn("Did not recognize type '%s' of column '%s'" %
-                                    (coltype, r[0]))
-                    coltype = coltype = sa_types.NULLTYPE
+                    util.warn("Did not recognize type '%s' of column '%s'" % (coltype, r[0]))
+                    coltype = sa_types.NULLTYPE
 
             sa_columns.append({
                     'name': self.normalize_name(r[0]),
                     'type': coltype,
                     'nullable': r[3] == 'Y',
                     'default': r[2],
-                    'autoincrement': (r[6] == 'YES') and (r[7] != None),
-                })
+                    'autoincrement': (r[6] == 'YES') and (r[7] is not None)})
         return sa_columns
 
     @reflection.cache
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(
-                                    schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysconst = self.sys_table_constraints
         syskeyconst = self.sys_key_constraints
@@ -635,8 +636,7 @@ class AS400Reflector(BaseReflector):
                     sysconst.c.contype == 'PRIMARY KEY'
             ), order_by=[syskeyconst.c.colno])
 
-        return [self.normalize_name(key[0])
-                    for key in connection.execute(query)]
+        return [self.normalize_name(key[0]) for key in connection.execute(query)]
 
     @reflection.cache
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
@@ -645,10 +645,10 @@ class AS400Reflector(BaseReflector):
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                                sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                                sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
-                                sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
+        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                            sysfkeys.c.pkname, sysfkeys.c.pktabschema,
+                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
                 sql.and_(
                     sysfkeys.c.fktabschema == current_schema,
                     sysfkeys.c.fktabname == table_name
@@ -657,51 +657,47 @@ class AS400Reflector(BaseReflector):
             )
         fschema = {}
         for r in connection.execute(query):
-            if not fschema.has_key(r[0]):
+            if r[0] not in fschema:
                 referred_schema = self.normalize_name(r[5])
 
                 # if no schema specified and referred schema here is the
                 # default, then set to None
-                if schema is None and \
-                    referred_schema == default_schema:
+                if schema is None and referred_schema == default_schema:
                     referred_schema = None
 
                 fschema[r[0]] = {'name': self.normalize_name(r[0]),
-                            'constrained_columns': [self.normalize_name(r[3])],
-                            'referred_schema': referred_schema,
-                            'referred_table': self.normalize_name(r[6]),
-                            'referred_columns': [self.normalize_name(r[7])]}
+                                 'constrained_columns': [self.normalize_name(r[3])],
+                                 'referred_schema': referred_schema,
+                                 'referred_table': self.normalize_name(r[6]),
+                                 'referred_columns': [self.normalize_name(r[7])]}
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
-        return [value for key, value in fschema.iteritems()]
+        return fschema.values()
 
     # Retrieves a list of index names for a given schema
     @reflection.cache
     def get_indexes(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(
-                                    schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
         syskey = self.sys_keys
 
-        query = sql.select([sysidx.c.indname,
-                            sysidx.c.uniquerule, syskey.c.colname], sql.and_(
-                    syskey.c.indschema == sysidx.c.indschema,
-                    syskey.c.indname == sysidx.c.indname,
-                    sysidx.c.tabschema == current_schema,
-                    sysidx.c.tabname == table_name
-                ), order_by=[syskey.c.indname, syskey.c.colno]
-            )
+        query = sql.select([sysidx.c.indname, sysidx.c.uniquerule, syskey.c.colname],
+                           sql.and_(syskey.c.indschema == sysidx.c.indschema,
+                                    syskey.c.indname == sysidx.c.indname,
+                                    sysidx.c.tabschema == current_schema,
+                                    sysidx.c.tabname == table_name),
+                           order_by=[syskey.c.indname, syskey.c.colno])
         indexes = {}
         for r in connection.execute(query):
             key = r[0].upper()
             if key in indexes:
                 indexes[key]['column_names'].append(self.normalize_name(r[2]))
             else:
-                indexes[key] = {
-                                'name': self.normalize_name(r[0]),
+                indexes[key] = {'name': self.normalize_name(r[0]),
                                 'column_names': [self.normalize_name(r[2])],
-                                'unique': r[1] == 'Y'
-                        }
-        return [value for key, value in indexes.iteritems()]
+                                'unique': r[1] == 'Y'}
+        return indexes.values()
+
+

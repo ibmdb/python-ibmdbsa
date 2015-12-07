@@ -21,12 +21,17 @@ from .base import DB2ExecutionContext, DB2Dialect
 from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
 from sqlalchemy.exc import ArgumentError
+
+if util.py3k:
+    long = int
+
 SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 if SA_Version < [0, 8]:
-    from sqlalchemy.engine import base
+    from sqlalchemy.engine.base import ResultProxy
 else:
-    from sqlalchemy.engine import result as _result
+    from sqlalchemy.engine import ResultProxy
+
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
     def result_processor(self, dialect, coltype):
@@ -51,28 +56,19 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
                 if bindparam.isoutparam:
                     self._out_parameters = True
                     break
-                
+
+
     def get_result_proxy(self):
+        result = ResultProxy(self)
         if self._callproc_result and self._out_parameters:
-            if SA_Version < [0, 8]:
-                result = base.ResultProxy(self)
-            else:
-                result = _result.ResultProxy(self)
             result.out_parameters = {}
-            
             for bindparam in self.compiled.binds.values():
                 if bindparam.isoutparam:
                     name = self.compiled.bind_names[bindparam]
                     result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
-            
-            return result
-        else:
-            if SA_Version < [0, 8]:
-                result = base.ResultProxy(self)
-            else:
-                result = _result.ResultProxy(self)
-            return result
-         
+        return result
+
+
 class DB2Dialect_ibm_db(DB2Dialect):
 
     driver = 'ibm_db_sa'
@@ -94,10 +90,12 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
     @classmethod
     def dbapi(cls):
-        """ Returns: the underlying DBAPI driver module
+        """
+        Returns: the underlying DBAPI driver module
         """
         import ibm_db_dbi as module
         return module
+
 
     def do_execute(self, cursor, statement, parameters, context=None):
         if context and context._out_parameters:
@@ -106,30 +104,29 @@ class DB2Dialect_ibm_db(DB2Dialect):
         else:
             cursor.execute(statement, parameters)
 
+
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
-        
+
+
     _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
                              'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
    
     def set_isolation_level(self, connection, level):    
-        if level is  None:
-         level ='CS' 
-        else :
-          if len(level.strip()) < 1:
+        if level is None or len(level.strip()) < 1:
             level ='CS'
-        level.upper().replace("-", " ")   
+        level = level.upper().replace("-", " ")
         if level not in self._isolation_lookup:
             raise ArgumentError(
                 "Invalid value '%s' for isolation_level. "
                 "Valid isolation levels for %s are %s" %
-                (level, self.name, ", ".join(self._isolation_lookup))
-            )
+                (level, self.name, ", ".join(self._isolation_lookup)))
         cursor = connection.cursor()
         cursor.execute("SET CURRENT ISOLATION %s" % level)
         cursor.execute("COMMIT")
         cursor.close()
-        
+
+
     def get_isolation_level(self, connection):
         cursor = connection.cursor()
         cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
@@ -138,10 +135,12 @@ class DB2Dialect_ibm_db(DB2Dialect):
         if util.py3k and isinstance(val, bytes):
             val = val.decode()
         return val
-    
+
+
     def reset_isolation_level(self, connection):
-        self.set_isolation_level(connection,'CS')
-        
+        self.set_isolation_level(connection, 'CS')
+
+
     def create_connect_args(self, url):
         # DSN support through CLI configuration (../cfg/db2cli.ini),
         # while 2 connection attributes are mandatory: database alias
@@ -154,13 +153,13 @@ class DB2Dialect_ibm_db(DB2Dialect):
             dsn = url.database
             uid = url.username
             pwd = url.password
-            return ((dsn, uid, pwd, '', ''), {})
+            return (dsn, uid, pwd, '', ''), {}
         else:
             # Full URL string support for connection to remote data servers
-            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}']
-            dsn_param.append('DATABASE=%s' % url.database)
-            dsn_param.append('HOSTNAME=%s' % url.host)
-            dsn_param.append('PROTOCOL=TCPIP')
+            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}',
+                         'DATABASE=%s' % url.database,
+                         'HOSTNAME=%s' % url.host,
+                         'PROTOCOL=TCPIP']
             if url.port:
                 dsn_param.append('PORT=%s' % url.port)
             if url.username:
@@ -180,7 +179,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
                            
             dsn = ';'.join(dsn_param)      
             dsn += ';'
-            return ((dsn, url.username, '', '', ''), {})
+            return (dsn, url.username, '', '', ''), {}
+
 
     # Retrieves current schema for the specified connection object
     def _get_default_schema_name(self, connection):
@@ -189,15 +189,16 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
     # Checks if the DB_API driver error indicates an invalid connection
     def is_disconnect(self, ex, connection, cursor):
-        if isinstance(ex, (self.dbapi.ProgrammingError,
-                                             self.dbapi.OperationalError)):
+        if isinstance(ex, (self.dbapi.ProgrammingError, self.dbapi.OperationalError)):
             connection_errors = ('Connection is not active', 'connection is no longer active',
-                                    'Connection Resource cannot be found', 'SQL30081N'
-                                    'CLI0108E', 'CLI0106E', 'SQL1224N')
+                                 'Connection Resource cannot be found', 'SQL30081N'
+                                 'CLI0108E', 'CLI0106E', 'SQL1224N')
             for err_msg in connection_errors:
                 if err_msg in str(ex):
                     return True
-        else:
-            return False
+        return False
+
 
 dialect = DB2Dialect_ibm_db
+
+

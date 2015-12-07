@@ -16,8 +16,8 @@
 # | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
-"""Support for IBM DB2 database
-
+"""
+Support for IBM DB2 database
 """
 import datetime, re
 from sqlalchemy import types as sa_types
@@ -32,6 +32,11 @@ from . import reflection as ibm_reflection
 from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER,\
     SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP,\
     VARCHAR, FLOAT
+
+if util.py3k:
+    long = int
+    xrange = range
+    basestring = (bytes, str) # should bytes be included?
 
 SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
@@ -122,11 +127,10 @@ class _IBM_Boolean(sa_types.Boolean):
         def process(value):
             if value is None:
                 return None
-            elif bool(value):
-                return '1'
             else:
-                return '0'
+                return '1' if bool(value) else '0'
         return process
+
 
 class _IBM_Date(sa_types.Date):
 
@@ -148,6 +152,7 @@ class _IBM_Date(sa_types.Date):
             return str(value)
         return process
 
+
 class DOUBLE(sa_types.Numeric):
     __visit_name__ = 'DOUBLE'
 
@@ -162,7 +167,6 @@ class GRAPHIC(sa_types.CHAR):
 
 class VARGRAPHIC(sa_types.Unicode):
     __visit_name__ = "VARGRAPHIC"
-
 
 class LONGVARGRAPHIC(sa_types.UnicodeText):
     __visit_name__ = "LONGVARGRAPHIC"
@@ -206,113 +210,105 @@ ischema_names = {
 
 class DB2TypeCompiler(compiler.GenericTypeCompiler):
 
-
-    def visit_TIMESTAMP(self, type_):
+    def visit_TIMESTAMP(self, type_, **kw):
         return "TIMESTAMP"
 
-    def visit_DATE(self, type_):
+    def visit_DATE(self, type_, **kw):
         return "DATE"
 
-    def visit_TIME(self, type_):
+    def visit_TIME(self, type_, **kw):
         return "TIME"
 
-    def visit_DATETIME(self, type_):
+    def visit_DATETIME(self, type_, **kw):
         return self.visit_TIMESTAMP(type_)
 
-    def visit_SMALLINT(self, type_):
+    def visit_SMALLINT(self, type_, **kw):
         return "SMALLINT"
 
-    def visit_INT(self, type_):
+    def visit_INT(self, type_, **kw):
         return "INT"
 
-    def visit_BIGINT(self, type_):
+    def visit_BIGINT(self, type_, **kw):
         return "BIGINT"
 
-    def visit_FLOAT(self, type_):
-        return "FLOAT" if type_.precision is None else \
-                "FLOAT(%(precision)s)" % {'precision': type_.precision}
+    def visit_FLOAT(self, type_, **kw):
+        return "FLOAT%s" % ('' if type_.precision is None else '(%s)' % type_.precision)
 
-    def visit_DOUBLE(self, type_):
+    def visit_DOUBLE(self, type_, **kw):
         return "DOUBLE"
 
-    def visit_XML(self, type_):
+    def visit_XML(self, type_, **kw):
         return "XML"
 
-    def visit_CLOB(self, type_):
+    def visit_CLOB(self, type_, **kw):
         return "CLOB"
 
-    def visit_BLOB(self, type_):
-        return "BLOB(1M)" if type_.length in (None, 0) else \
-                "BLOB(%(length)s)" % {'length': type_.length}
+    def visit_BLOB(self, type_, **kw):
+        return "BLOB(1M)" if type_.length in (None, 0) else "BLOB(%s)" % type_.length
 
-    def visit_DBCLOB(self, type_):
-        return "DBCLOB(1M)" if type_.length in (None, 0) else \
-                "DBCLOB(%(length)s)" % {'length': type_.length}
+    def visit_DBCLOB(self, type_, **kw):
+        return "DBCLOB(1M)" if type_.length in (None, 0) else "DBCLOB(%s)" % type_.length
 
-    def visit_VARCHAR(self, type_):
-        return "VARCHAR(%(length)s)" % {'length': type_.length}
+    def visit_VARCHAR(self, type_, **kw):
+        return "VARCHAR(%s)" % type_.length
 
-    def visit_LONGVARCHAR(self, type_):
+    def visit_LONGVARCHAR(self, type_, **kw):
         return "LONG VARCHAR"
 
-    def visit_VARGRAPHIC(self, type_):
-        return "VARGRAPHIC(%(length)s)" % {'length': type_.length}
+    def visit_VARGRAPHIC(self, type_, **kw):
+        return "VARGRAPHIC(%s)" % type_.length
 
-    def visit_LONGVARGRAPHIC(self, type_):
+    def visit_LONGVARGRAPHIC(self, type_, **kw):
         return "LONG VARGRAPHIC"
 
-    def visit_CHAR(self, type_):
-        return "CHAR" if type_.length in (None, 0) else \
-                "CHAR(%(length)s)" % {'length': type_.length}
+    def visit_CHAR(self, type_, **kw):
+        return "CHAR" if type_.length in (None, 0) else "CHAR(%s)" % type_.length
 
-    def visit_GRAPHIC(self, type_):
-        return "GRAPHIC" if type_.length in (None, 0) else \
-                "GRAPHIC(%(length)s)" % {'length': type_.length}
+    def visit_GRAPHIC(self, type_, **kw):
+        return "GRAPHIC" if type_.length in (None, 0) else "GRAPHIC(%s)" % type_.length
 
-    def visit_DECIMAL(self, type_):
+    def visit_DECIMAL(self, type_, **kw):
         if not type_.precision:
             return "DECIMAL(31, 0)"
         elif not type_.scale:
-            return "DECIMAL(%(precision)s, 0)" % {'precision': type_.precision}
+            return "DECIMAL(%s, 0)" % type_.precision
         else:
-            return "DECIMAL(%(precision)s, %(scale)s)" % {
-                            'precision': type_.precision, 'scale': type_.scale}
+            return "DECIMAL(%s, %s)" % (type_.precision, type_.scale)
 
-
-    def visit_numeric(self, type_):
+    def visit_numeric(self, type_, **kw):
         return self.visit_DECIMAL(type_)
 
-    def visit_datetime(self, type_):
+    def visit_datetime(self, type_, **kw):
         return self.visit_TIMESTAMP(type_)
 
-    def visit_date(self, type_):
+    def visit_date(self, type_, **kw):
         return self.visit_DATE(type_)
 
-    def visit_time(self, type_):
+    def visit_time(self, type_, **kw):
         return self.visit_TIME(type_)
 
-    def visit_integer(self, type_):
+    def visit_integer(self, type_, **kw):
         return self.visit_INT(type_)
 
-    def visit_boolean(self, type_):
+    def visit_boolean(self, type_, **kw):
         return self.visit_SMALLINT(type_)
 
-    def visit_float(self, type_):
+    def visit_float(self, type_, **kw):
         return self.visit_FLOAT(type_)
 
-    def visit_unicode(self, type_):
+    def visit_unicode(self, type_, **kw):
         return self.visit_VARGRAPHIC(type_)
 
-    def visit_unicode_text(self, type_):
+    def visit_unicode_text(self, type_, **kw):
         return self.visit_LONGVARGRAPHIC(type_)
 
-    def visit_string(self, type_):
+    def visit_string(self, type_, **kw):
         return self.visit_VARCHAR(type_)
 
-    def visit_TEXT(self, type_):
+    def visit_TEXT(self, type_, **kw):
         return self.visit_CLOB(type_)
 
-    def visit_large_binary(self, type_):
+    def visit_large_binary(self, type_, **kw):
         return self.visit_BLOB(type_)
 
 
@@ -331,8 +327,8 @@ class DB2Compiler(compiler.SQLCompiler):
     def visit_now_func(self, fn, **kw):
         return "CURRENT_TIMESTAMP"
 
-    def for_update_clause(self, select):
-        if select.for_update == True:
+    def for_update_clause(self, select, **kw):
+        if select.for_update is True:
             return ' WITH RS USE AND KEEP UPDATE LOCKS'
         elif select.for_update == 'read':
             return ' WITH RS USE AND KEEP SHARE LOCKS'
@@ -343,7 +339,7 @@ class DB2Compiler(compiler.SQLCompiler):
         return "mod(%s, %s)" % (self.process(binary.left),
                                                 self.process(binary.right))
 
-    def limit_clause(self, select):
+    def limit_clause(self, select, **kw):
         if (select._limit is not None) and (select._offset is None):
             return " FETCH FIRST %s ROWS ONLY" % select._limit
         else:
@@ -355,7 +351,6 @@ class DB2Compiler(compiler.SQLCompiler):
         if offset is not None:
             __rownum = 'Z.__ROWNUM'
             sql_split = re.split("[\s+]FROM ", sql_ori, 1)
-            sql_sec = ""
             sql_sec = " \nFROM %s " % ( sql_split[1] )
 
             dummyVal = "Z.__db2_"
@@ -367,7 +362,7 @@ class DB2Compiler(compiler.SQLCompiler):
 
             sql_select_token = sql_split[0].split( "," )
             i = 0
-            while ( i < len( sql_select_token ) ):
+            while i < len(sql_select_token):
                 if sql_select_token[i].count( "TIMESTAMP(DATE(SUBSTR(CHAR(" ) == 1:
                     sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
                     sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % (
@@ -377,19 +372,19 @@ class DB2Compiler(compiler.SQLCompiler):
                                     sql_select_token[i + 2],
                                     sql_select_token[i + 3],
                                     dummyVal, i + 1 )
-                    i = i + 4
+                    i += 4
                     continue
 
                 if sql_select_token[i].count( " AS " ) == 1:
                     temp_col_alias = sql_select_token[i].split( " AS " )
                     sql_pri = '%s %s,' % ( sql_pri, sql_select_token[i] )
                     sql_sel = "%s %s," % ( sql_sel, temp_col_alias[1] )
-                    i = i + 1
+                    i += 1
                     continue
 
                 sql_pri = '%s %s AS "%s%d",' % ( sql_pri, sql_select_token[i], dummyVal, i + 1 )
                 sql_sel = "%s \"%s%d\"," % ( sql_sel, dummyVal, i + 1 )
-                i = i + 1
+                i += 1
 
             sql_pri = sql_pri[:len( sql_pri ) - 1]
             sql_pri = "%s%s" % ( sql_pri, sql_sec )
@@ -400,10 +395,10 @@ class DB2Compiler(compiler.SQLCompiler):
             if offset is not 0:
                 sql = '%s "%s" > %d' % ( sql, __rownum, offset )
             if offset is not 0 and limit is not None:
-                sql = '%s AND ' % ( sql )
+                sql = '%s AND ' % (sql,)
             if limit is not None:
                 sql = '%s "%s" <= %d' % ( sql, __rownum, offset + limit )
-            return "( %s )" % ( sql, )
+            return "( %s )" % (sql,)
         else:
             return sql_ori
 
@@ -441,7 +436,7 @@ class DB2Compiler(compiler.SQLCompiler):
         else:
             return self.process(cast.clause)
 
-    def get_select_precolumns(self, select):
+    def get_select_precolumns(self, select, **kw):
         if isinstance(select._distinct, basestring):
             return select._distinct.upper() + " "
         elif select._distinct:
@@ -460,44 +455,49 @@ class DB2Compiler(compiler.SQLCompiler):
              self.process(join.onclause, **kwargs)))
 
     def visit_savepoint(self, savepoint_stmt):
-        return "SAVEPOINT %(sid)s ON ROLLBACK RETAIN CURSORS" % {'sid':self.preparer.format_savepoint(savepoint_stmt)}
+        return "SAVEPOINT %s ON ROLLBACK RETAIN CURSORS" % self.preparer.format_savepoint(savepoint_stmt)
 
     def visit_rollback_to_savepoint(self, savepoint_stmt):
-        return 'ROLLBACK TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
+        return 'ROLLBACK TO SAVEPOINT %s'% self.preparer.format_savepoint(savepoint_stmt)
 
     def visit_release_savepoint(self, savepoint_stmt):
-        return 'RELEASE TO SAVEPOINT %(sid)s'% {'sid':self.preparer.format_savepoint(savepoint_stmt)}
+        return 'RELEASE TO SAVEPOINT %s'% self.preparer.format_savepoint(savepoint_stmt)
     
     def visit_unary(self, unary, **kw):
-        if (unary.operator == operators.exists)  and kw.get('within_columns_clause', False):
+        if unary.operator == operators.exists and kw.get('within_columns_clause', False):
             usql = super(DB2Compiler, self).visit_unary(unary, **kw)
             usql = "CASE WHEN " + usql + " THEN 1 ELSE 0 END"
             return usql
         else:
             return super(DB2Compiler, self).visit_unary(unary, **kw)
 
+
 class DB2DDLCompiler(compiler.DDLCompiler):
     
     def get_server_version_info(self, dialect):
-        """Returns the DB2 server major and minor version as a list of ints."""
+        """
+        Returns the DB2 server major and minor version as a list of ints.
+        """
         if hasattr(dialect, 'dbms_ver'):
             return [int(ver_token) for ver_token in dialect.dbms_ver.split('.')[0:2]]
         else:
             return []
-    
+
+
     def _is_nullable_unique_constraint_supported(self, dialect):
-        """Checks to see if the DB2 version is at least 10.5.
+        """
+        Checks to see if the DB2 version is at least 10.5.
         This is needed for checking if unique constraints with null columns are supported.
         """
-        if hasattr(dialect, 'dbms_name') and (dialect.dbms_name.find('DB2/') != -1):
+        if hasattr(dialect, 'dbms_name') and dialect.dbms_name.find('DB2/') != -1:
             return self.get_server_version_info(dialect) >= [10, 5]
         else:
             return False
 
-    def get_column_specification(self, column, **kw):
-        col_spec = [self.preparer.format_column(column)]
-        col_spec.append(self.dialect.type_compiler.process(column.type))
 
+    def get_column_specification(self, column, **kw):
+        col_spec = [self.preparer.format_column(column),
+                    self.dialect.type_compiler.process(column.type)]
 
         # column-options: "NOT NULL"
         if not column.nullable or column.primary_key:
@@ -517,16 +517,15 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         column_spec = ' '.join(col_spec)
         return column_spec
 
+
     def define_constraint_cascades(self, constraint):
         text = ""
         if constraint.ondelete is not None:
             text += " ON DELETE %s" % constraint.ondelete
-
         if constraint.onupdate is not None:
-            util.warn(
-                "DB2 does not support UPDATE CASCADE for foreign keys.")
-
+            util.warn("DB2 does not support UPDATE CASCADE for foreign keys.")
         return text
+
 
     def visit_drop_constraint(self, drop, **kw):
         constraint = drop.element
@@ -550,12 +549,11 @@ class DB2DDLCompiler(compiler.DDLCompiler):
             const = self.preparer.format_constraint(constraint)
             
         if hasattr(constraint, 'uConstraint_as_index') and constraint.uConstraint_as_index:
-            return "DROP %s%s" % \
-                                (qual, const)
-        return "ALTER TABLE %s DROP %s%s" % \
-                                (self.preparer.format_table(constraint.table),
-                                qual, const)
-                                
+            return "DROP %s%s" % (qual, const)
+
+        return "ALTER TABLE %s DROP %s%s" % (self.preparer.format_table(constraint.table), qual, const)
+
+
     def create_table_constraints(self, table, **kw):
         if self._is_nullable_unique_constraint_supported(self.dialect):
             for constraint in table._sorted_constraints:
@@ -567,7 +565,8 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                             break
                     if getattr(constraint, 'uConstraint_as_index', None):
                         if not constraint.name:
-                            index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table), '_'.join(column.name for column in constraint))
+                            index_name = "%s_%s_%s" % ('ukey', self.preparer.format_table(constraint.table),
+                                                       '_'.join(column.name for column in constraint))
                         else:
                             index_name = constraint.name
                         index = sa_schema.Index(index_name, *(column for column in constraint))
@@ -575,7 +574,8 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                         index.uConstraint_as_index = True
         result = super( DB2DDLCompiler, self ).create_table_constraints(table, **kw)
         return result
-    
+
+
     def visit_create_index(self, create, include_schema=True, include_table_schema=True):
         if SA_Version < [0, 8]:
             sql = super( DB2DDLCompiler, self ).visit_create_index(create)
@@ -584,6 +584,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         if getattr(create.element, 'uConstraint_as_index', None):
             sql += ' EXCLUDE NULL KEYS'
         return sql
+
 
     def visit_add_constraint(self, create):
         if self._is_nullable_unique_constraint_supported(self.dialect):
@@ -594,7 +595,8 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                         break
                 if getattr(create.element, 'uConstraint_as_index', None):
                     if not create.element.name:
-                        index_name = "%s_%s_%s" % ('uk_index', self.preparer.format_table(create.element.table), '_'.join(column.name for column in create.element))
+                        index_name = "%s_%s_%s" % ('uk_index', self.preparer.format_table(create.element.table),
+                                                   '_'.join(column.name for column in create.element))
                     else:
                         index_name = create.element.name
                     index = sa_schema.Index(index_name, *(column for column in create.element))
@@ -604,7 +606,8 @@ class DB2DDLCompiler(compiler.DDLCompiler):
                     return sql
         sql = super( DB2DDLCompiler, self ).visit_add_constraint(create)
         return sql
-    
+
+
 class DB2IdentifierPreparer(compiler.IdentifierPreparer):
 
     reserved_words = RESERVED_WORDS
@@ -616,6 +619,7 @@ class DB2ExecutionContext(default.DefaultExecutionContext):
         return self._execute_scalar("SELECT NEXTVAL FOR " +
                     self.dialect.identifier_preparer.format_sequence(seq) +
                     " FROM SYSIBM.SYSDUMMY1", type_)
+
 
 class _SelectLastRowIDMixin(object):
     _select_lastrowid = False
@@ -686,7 +690,6 @@ class DB2Dialect(default.DefaultDialect):
 
     def __init__(self, **kw):
         super(DB2Dialect, self).__init__(**kw)
-
         self._reflector = self._reflector_cls(self)
 
     # reflection: these all defer to an BaseDB2Reflector
@@ -709,12 +712,10 @@ class DB2Dialect(default.DefaultDialect):
         return self._reflector.has_table(connection, table_name, schema=schema)
 
     def has_sequence(self, connection, sequence_name, schema=None):
-        return self._reflector.has_sequence(connection, sequence_name,
-                        schema=schema)
+        return self._reflector.has_sequence(connection, sequence_name, schema=schema)
 
     def get_schema_names(self, connection, **kw):
         return self._reflector.get_schema_names(connection, **kw)
-
 
     def get_table_names(self, connection, schema=None, **kw):
         return self._reflector.get_table_names(connection, schema=schema, **kw)
@@ -723,32 +724,25 @@ class DB2Dialect(default.DefaultDialect):
         return self._reflector.get_view_names(connection, schema=schema, **kw)
 
     def get_view_definition(self, connection, viewname, schema=None, **kw):
-        return self._reflector.get_view_definition(
-                                connection, viewname, schema=schema, **kw)
+        return self._reflector.get_view_definition(connection, viewname, schema=schema, **kw)
 
     def get_columns(self, connection, table_name, schema=None, **kw):
-        return self._reflector.get_columns(
-                                connection, table_name, schema=schema, **kw)
+        return self._reflector.get_columns(connection, table_name, schema=schema, **kw)
 
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
-        return self._reflector.get_primary_keys(
-                                connection, table_name, schema=schema, **kw)
+        return self._reflector.get_primary_keys(connection, table_name, schema=schema, **kw)
 
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-        return self._reflector.get_foreign_keys(
-                                connection, table_name, schema=schema, **kw)
+        return self._reflector.get_foreign_keys(connection, table_name, schema=schema, **kw)
         
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
-        return self._reflector.get_incoming_foreign_keys(
-                                connection, table_name, schema=schema, **kw)
+        return self._reflector.get_incoming_foreign_keys(connection, table_name, schema=schema, **kw)
 
     def get_indexes(self, connection, table_name, schema=None, **kw):
-        return self._reflector.get_indexes(
-                                connection, table_name, schema=schema, **kw)
+        return self._reflector.get_indexes(connection, table_name, schema=schema, **kw)
         
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
-        return self._reflector.get_unique_constraints(
-                                connection, table_name, schema=schema, **kw)
+        return self._reflector.get_unique_constraints(connection, table_name, schema=schema, **kw)
 
 
 # legacy naming
