@@ -69,18 +69,18 @@ class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
         # TODO: this should be somewhere else
         class IBM_DB2DataHandler(FilterDataHandler):
 
-            def setJDBCObject(self, statement, index, object, dbtype=None):
+            def setJDBCObject(self, statement, index, pyobject, dbtype=None):
                 if dbtype is None:
-                    if isinstance(object, int):
-                        statement.setObject(index, str(object), java_Types.INTEGER)
-                    elif isinstance(object, long):
-                        statement.setObject(index, str(object), java_Types.BIGINT)
-                    elif isinstance(object, _python_Decimal):
-                        statement.setObject(index, str(object), java_Types.DECIMAL)
+                    if isinstance(pyobject, int):
+                        statement.setObject(index, str(pyobject), java_Types.INTEGER)
+                    elif isinstance(pyobject, long):
+                        statement.setObject(index, str(pyobject), java_Types.BIGINT)
+                    elif isinstance(pyobject, _python_Decimal):
+                        statement.setObject(index, str(pyobject), java_Types.DECIMAL)
                     else:
-                        statement.setObject(index, object)
+                        statement.setObject(index, pyobject)
                 else:
-                    FilterDataHandler.setJDBCObject(self, statement, index, object, dbtype)
+                    FilterDataHandler.setJDBCObject(self, statement, index, pyobject, dbtype)
 
         cls.DataHandler = IBM_DB2DataHandler
         return zxJDBC

@@ -19,19 +19,22 @@
 """
 Support for IBM DB2 database
 """
-import datetime, re
+import datetime
+import re
+
 from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
 from sqlalchemy import util
+from sqlalchemy import __version__ as SA_Version
+from sqlalchemy.engine import default
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql import operators
-from sqlalchemy.engine import default
-from sqlalchemy import __version__ as SA_Version
+from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER, \
+    SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP, \
+    VARCHAR, FLOAT
+
 from . import reflection as ibm_reflection
 
-from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER,\
-    SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP,\
-    VARCHAR, FLOAT
 
 if util.py3k:
     long = int
@@ -657,9 +660,6 @@ class DB2Dialect(default.DefaultDialect):
     colspecs = colspecs
     ischema_names = ischema_names
     supports_char_length = False
-    supports_unicode_statements = False
-    supports_unicode_binds = False
-    returns_unicode_strings = False
     postfetch_lastrowid = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = True
@@ -751,3 +751,5 @@ IBM_DBExecutionContext = DB2ExecutionContext
 IBM_DBDialect = DB2Dialect
 
 dialect = DB2Dialect
+
+

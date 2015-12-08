@@ -18,13 +18,15 @@
 # +--------------------------------------------------------------------------+
 from sqlalchemy import util
 from sqlalchemy.connectors.pyodbc import PyODBCConnector
-from .base import _SelectLastRowIDMixin, DB2ExecutionContext, DB2Dialect
-from . import reflection as ibm_reflection
 
 if util.py3k:
     from urllib.parse import unquote_plus
 else:
     from urllib import unquote_plus
+
+from .base import _SelectLastRowIDMixin, DB2ExecutionContext, DB2Dialect
+from . import reflection as ibm_reflection
+
 
 
 class DB2ExecutionContext_pyodbc(_SelectLastRowIDMixin, DB2ExecutionContext):
@@ -48,7 +50,7 @@ class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
         keys = opts
         query = url.query
 
-        connect_args = {}
+        connect_args = dict()
         for param in ('ansi', 'unicode_results', 'autocommit'):
             if param in keys:
                 connect_args[param] = util.asbool(keys.pop(param))
@@ -106,7 +108,7 @@ class AS400Dialect_pyodbc(PyODBCConnector, DB2Dialect):
 
         keys = opts
 
-        connect_args = {}
+        connect_args = dict()
         for param in ('ansi', 'unicode_results', 'autocommit'):
             if param in keys:
                 connect_args[param] = util.asbool(keys.pop(param))

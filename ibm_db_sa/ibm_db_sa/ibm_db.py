@@ -68,11 +68,16 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
                     result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
         return result
 
+    def get_rowcount(self):
+        return self.cursor.rowcount
+
+    def result(self):
+        return ResultProxy(self)
+
 
 class DB2Dialect_ibm_db(DB2Dialect):
 
     driver = 'ibm_db_sa'
-    supports_unicode_statements = False
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = False
     supports_native_decimal = False
@@ -107,7 +112,6 @@ class DB2Dialect_ibm_db(DB2Dialect):
             statement = statement.split('(', 1)[0].split()[1]
             context._callproc_result = cursor.callproc(statement, parameters)
         else:
-            print("do_execute stmt: '{}' params: '{}'".format(statement, parameters))
             cursor.execute(statement, parameters)
 
 
