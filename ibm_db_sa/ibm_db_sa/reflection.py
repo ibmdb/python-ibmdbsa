@@ -203,7 +203,7 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
         query = sql.select([systbl.c.tabname]).\
-                    where(systbl.c.type == 'T').\
+                    where(systbl.c.type.in_(('T', 'A'))).\
                     where(systbl.c.tabschema == current_schema).\
                     order_by(systbl.c.tabname)
         return [self.normalize_name(row[0]) for row in connection.execute(query)]

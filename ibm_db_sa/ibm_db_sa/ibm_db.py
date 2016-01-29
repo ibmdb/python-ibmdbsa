@@ -178,9 +178,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
             #check for SSL arguments
             ssl_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash']
-            query_keys = url.query.keys()
             for key in ssl_keys:
-                for query_key in query_keys:
+                for query_key in url.query.keys():
                     if query_key.lower() == key.lower():
                         dsn_param.append('%(ssl_key)s=%(value)s' % {'ssl_key': key, 'value': url.query[query_key]})
                         del url.query[query_key]
