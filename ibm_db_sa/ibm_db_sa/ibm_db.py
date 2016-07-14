@@ -21,6 +21,11 @@ from .base import DB2ExecutionContext, DB2Dialect
 from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
 from sqlalchemy.exc import ArgumentError
+try:
+    long = long
+except NameError:
+    long = int
+
 SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 if SA_Version < [0, 8]:
@@ -100,6 +105,9 @@ class DB2Dialect_ibm_db(DB2Dialect):
         return module
 
     def do_execute(self, cursor, statement, parameters, context=None):
+        if isinstance(statement,bytes):
+            statement = statement.decode('utf-8')
+        
         if context and context._out_parameters:
             statement = statement.split('(', 1)[0].split()[1]
             context._callproc_result = cursor.callproc(statement, parameters)
