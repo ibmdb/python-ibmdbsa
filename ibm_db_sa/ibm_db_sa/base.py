@@ -28,6 +28,15 @@ from sqlalchemy.sql import operators
 from sqlalchemy.engine import default
 from sqlalchemy import __version__ as SA_Version
 from . import reflection as ibm_reflection
+try:
+    long = long
+except NameError:
+    long = int
+
+try:
+    xrange
+except NameError:
+    xrange = range
 
 from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER,\
     SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP,\
