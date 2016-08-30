@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008, 2014.                                |
+# | (C) Copyright IBM Corporation 2008, 2016.                                |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.8 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -33,7 +33,7 @@ from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER,\
     SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP,\
     VARCHAR, FLOAT
 
-SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
+SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 # as documented from:
 # http://publib.boulder.ibm.com/infocenter/db2luw/v9/index.jsp?topic=/com.ibm.db2.udb.doc/admin/r0001095.htm
@@ -442,7 +442,7 @@ class DB2Compiler(compiler.SQLCompiler):
             return self.process(cast.clause)
 
     def get_select_precolumns(self, select):
-        if isinstance(select._distinct, basestring):
+        if isinstance(select._distinct, str):
             return select._distinct.upper() + " "
         elif select._distinct:
             return "DISTINCT "
@@ -608,7 +608,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
 class DB2IdentifierPreparer(compiler.IdentifierPreparer):
 
     reserved_words = RESERVED_WORDS
-    illegal_initial_characters = set(xrange(0, 10)).union(["_", "$"])
+    illegal_initial_characters = set(range(0, 10)).union(["_", "$"])
 
 
 class DB2ExecutionContext(default.DefaultExecutionContext):

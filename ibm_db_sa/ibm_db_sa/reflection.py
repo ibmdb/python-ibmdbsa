@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008, 2013.                                |
+# | (C) Copyright IBM Corporation 2008, 2016.                                |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.8 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -14,7 +14,7 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
-# | Contributors: Jaimy Azle, Mike Bayer                                     |
+# | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                                    |
 # +--------------------------------------------------------------------------+
 
 from sqlalchemy import types as sa_types
@@ -22,7 +22,7 @@ from sqlalchemy import sql, util
 from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
 import re
-
+import codecs
 
 
 class CoerceUnicode(sa_types.TypeDecorator):
@@ -30,7 +30,7 @@ class CoerceUnicode(sa_types.TypeDecorator):
 
     def process_bind_param(self, value, dialect):
         if isinstance(value, str):
-            value = value.decode(dialect.encoding)
+            value = value
         return value
 
 class BaseReflector(object):
@@ -41,7 +41,7 @@ class BaseReflector(object):
 
     def normalize_name(self, name):
         if isinstance(name, str):
-            name = name.decode(self.dialect.encoding)
+            name = name
         if name != None:
             return name.lower() if name.upper() == name and \
                not self.identifier_preparer._requires_quotes(name.lower()) \
@@ -55,7 +55,10 @@ class BaseReflector(object):
                 not self.identifier_preparer._requires_quotes(name.lower()):
             name = name.upper()
         if not self.dialect.supports_unicode_binds:
-            name = name.encode(self.dialect.encoding)
+            if(isinstance(name, str)):
+                name = name
+            else:
+                name = codecs.decode(name)
         else:
             name = unicode(name)
         return name
@@ -301,7 +304,7 @@ class DB2Reflector(BaseReflector):
 
         fschema = {}
         for r in connection.execute(query):
-            if not fschema.has_key(r[0]):
+            if not (r[0]) in fschema:
                 referred_schema = self.normalize_name(r[5])
 
                 # if no schema specified and referred schema here is the
@@ -319,7 +322,7 @@ class DB2Reflector(BaseReflector):
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
-        return [value for key, value in fschema.iteritems()]
+        return [value for key, value in fschema.items()]
     
     @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):

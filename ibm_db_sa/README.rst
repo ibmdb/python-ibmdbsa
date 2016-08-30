@@ -5,7 +5,7 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.3.2 (2014/10/20)
+0.3.3 (2016/08/30)
 
 Prerequisites
 --------------
@@ -66,9 +66,6 @@ Known Limitations in ibm_db_sa adapter for DB2 databases
 6) Subquery in ON clause of LEFT OUTER JOIN not supported
 7) PyODBC and Jython/zxjdbc support is experimental
 
-Not Supported / Not Tested
----------------------------
-- Python 3 has not yet been tested.
 
 Credits
 -------

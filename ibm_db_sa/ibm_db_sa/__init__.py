@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008, 2014.                                |
+# | (C) Copyright IBM Corporation 2008, 2016.                                |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.8 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -17,7 +17,7 @@
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
 
-__version__ = '0.3.2'
+__version__ = '0.3.3'
 
 from . import ibm_db, pyodbc, base, zxjdbc
 

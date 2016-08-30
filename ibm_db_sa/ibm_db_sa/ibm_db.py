@@ -1,7 +1,7 @@
 # +--------------------------------------------------------------------------+
 # |  Licensed Materials - Property of IBM                                    |
 # |                                                                          |
-# | (C) Copyright IBM Corporation 2008, 2014.                                |
+# | (C) Copyright IBM Corporation 2008, 2016.                                |
 # +--------------------------------------------------------------------------+
 # | This module complies with SQLAlchemy 0.8 and is                          |
 # | Licensed under the Apache License, Version 2.0 (the "License");          |
@@ -14,14 +14,14 @@
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
 # | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
-# | Contributors: Jaimy Azle, Mike Bayer                                     |
+# | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                                     |
 # +--------------------------------------------------------------------------+
 
 from .base import DB2ExecutionContext, DB2Dialect
 from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
 from sqlalchemy.exc import ArgumentError
-SA_Version = [long(ver_token) for ver_token in SA_Version.split('.')[0:2]]
+SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 if SA_Version < [0, 8]:
     from sqlalchemy.engine import base
@@ -76,7 +76,7 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 class DB2Dialect_ibm_db(DB2Dialect):
 
     driver = 'ibm_db_sa'
-    supports_unicode_statements = False
+    supports_unicode_statements = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = False
     supports_native_decimal = False
@@ -166,6 +166,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
             if url.username:
                 dsn_param.append('UID=%s' % url.username)
             if url.password:
+                if ';' in url.password:
+                    url.password=(url.password).partition(";")[0]
                 dsn_param.append('PWD=%s' % url.password)
             
             #check for SSL arguments
