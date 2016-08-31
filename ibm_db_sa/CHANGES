@@ -1,5 +1,8 @@
 CHANGES
 =======
+2016/08/30
+-Added Support for Python 3.x
+
 2014/10/20 (IBM_DB_SA adaptor 0.3.2)
 - Added SSL support
 - Added get_incoming_foreign_keys functionality with reflector 
