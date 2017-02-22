@@ -538,11 +538,10 @@ class AS400Reflector(BaseReflector):
     @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_schemas
-        query = sql.select([sysschema.c.schemaname],
-                sql.not_(sysschema.c.schemaname.like('SYS%')),
-                sql.not_(sysschema.c.schemaname.like('Q%')),
-                order_by=[sysschema.c.schemaname]
-        )
+        query = sql.select([sysschema.c.schemaname]).\
+                where(~sysschema.c.schemaname.like(unicode('Q%'))).\
+                where(~sysschema.c.schemaname.like(unicode('SYS%'))).\
+                order_by(sysschema.c.schemaname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     # Retrieves a list of table names for a given schema
@@ -551,7 +550,7 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
         query = sql.select([systbl.c.tabname]).\
-                where(systbl.c.tabtype == 'T').\
+                where(systbl.c.tabtype == unicode('T')).\
                 where(systbl.c.tabschema == current_schema).\
                 order_by(systbl.c.tabname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
@@ -615,9 +614,9 @@ class AS400Reflector(BaseReflector):
             sa_columns.append({
                     'name': self.normalize_name(r[0]),
                     'type': coltype,
-                    'nullable': r[3] == 'Y',
+                    'nullable': r[3] == unicode('Y'),
                     'default': r[2],
-                    'autoincrement': (r[6] == 'YES') and (r[7] != None),
+                    'autoincrement': (r[6] == unicode('YES')) and (r[7] != None),
                 })
         return sa_columns
 
@@ -635,7 +634,7 @@ class AS400Reflector(BaseReflector):
                     syskeyconst.c.conname == sysconst.c.conname,
                     sysconst.c.tabschema == current_schema,
                     sysconst.c.tabname == table_name,
-                    sysconst.c.contype == 'PRIMARY KEY'
+                    sysconst.c.contype == unicode('PRIMARY KEY')
             ), order_by=[syskeyconst.c.colno])
 
         return [self.normalize_name(key[0])
@@ -685,6 +684,7 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(
                                     schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
+        
         sysidx = self.sys_indexes
         syskey = self.sys_keys
 
@@ -705,6 +705,34 @@ class AS400Reflector(BaseReflector):
                 indexes[key] = {
                                 'name': self.normalize_name(r[0]),
                                 'column_names': [self.normalize_name(r[2])],
-                                'unique': r[1] == 'Y'
+                                'unique': r[1] == unicode('Y')
                         }
         return [value for key, value in indexes.iteritems()]
+
+    @reflection.cache
+    def get_unique_constraints(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+
+        syskeycol = self.sys_key_constraints
+        sysconst = self.sys_table_constraints
+        query = sql.select([syskeycol.c.conname, syskeycol.c.colname], sql.and_(
+              syskeycol.c.conname == sysconst.c.conname,
+              sysconst.c.tabname == table_name,
+              sysconst.c.tabschema == current_schema,
+              sysconst.c.contype == unicode('UNIQUE')
+            ),
+            order_by=[syskeycol.c.conname]
+          )
+        uniqueConsts = []
+        currConst = None
+        for r in connection.execute(query):
+            if currConst == r[0].upper():
+                uniqueConsts[-1]['column_names'].append(self.normalize_name(r[1]))
+            else:
+                currConst = r[0].upper()
+                uniqueConsts.append({
+                        'name': self.normalize_name(currConst),
+                        'column_names': [self.normalize_name(r[1])],
+                    })
+        return uniqueConsts
