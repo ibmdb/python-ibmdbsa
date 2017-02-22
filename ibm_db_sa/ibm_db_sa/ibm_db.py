@@ -109,38 +109,38 @@ class DB2Dialect_ibm_db(DB2Dialect):
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
         
-    _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
-                             'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
+#    _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
+#                             'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
    
-    def set_isolation_level(self, connection, level):    
-        if level is  None:
-         level ='CS' 
-        else :
-          if len(level.strip()) < 1:
-            level ='CS'
-        level.upper().replace("-", " ")   
-        if level not in self._isolation_lookup:
-            raise ArgumentError(
-                "Invalid value '%s' for isolation_level. "
-                "Valid isolation levels for %s are %s" %
-                (level, self.name, ", ".join(self._isolation_lookup))
-            )
-        cursor = connection.cursor()
-        cursor.execute("SET CURRENT ISOLATION %s" % level)
-        cursor.execute("COMMIT")
-        cursor.close()
-        
-    def get_isolation_level(self, connection):
-        cursor = connection.cursor()
-        cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
-        val = cursor.fetchone()[0]
-        cursor.close()
-        if util.py3k and isinstance(val, bytes):
-            val = val.decode()
-        return val
-    
-    def reset_isolation_level(self, connection):
-        self.set_isolation_level(connection,'CS')
+#    def set_isolation_level(self, connection, level):    
+#        if level is  None:
+#         level ='CS' 
+#        else :
+#          if len(level.strip()) < 1:
+#            level ='CS'
+#        level.upper().replace("-", " ")   
+#        if level not in self._isolation_lookup:
+#            raise ArgumentError(
+#                "Invalid value '%s' for isolation_level. "
+#                "Valid isolation levels for %s are %s" %
+#                (level, self.name, ", ".join(self._isolation_lookup))
+#            )
+#        cursor = connection.cursor()
+#        cursor.execute("SET CURRENT ISOLATION %s" % level)
+#        cursor.execute("COMMIT")
+#        cursor.close()
+#        
+#    def get_isolation_level(self, connection):
+#        cursor = connection.cursor()
+#        cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
+#        val = cursor.fetchone()[0]
+#        cursor.close()
+#        if util.py3k and isinstance(val, bytes):
+#            val = val.decode()
+#        return val
+#    
+#    def reset_isolation_level(self, connection):
+#        self.set_isolation_level(connection,'CS')
         
     def create_connect_args(self, url):
         # DSN support through CLI configuration (../cfg/db2cli.ini),
@@ -157,7 +157,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
             return ((dsn, uid, pwd, '', ''), {})
         else:
             # Full URL string support for connection to remote data servers
-            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}']
+#            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}']
+	    dsn_param = []
             dsn_param.append('DATABASE=%s' % url.database)
             dsn_param.append('HOSTNAME=%s' % url.host)
             dsn_param.append('PROTOCOL=TCPIP')
