@@ -34,6 +34,7 @@ setup(
          packages=['ibm_db_sa'],
         entry_points={
          'sqlalchemy.dialects': [
+        	     'db2as400=ibm_db_sa.AS400db:AS400Dialect',
                      'db2=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
                      'db2.ibm_db=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
                      'db2.zxjdbc=ibm_db_sa.zxjdbc:DB2Dialect_zxjdbc',
