@@ -81,7 +81,7 @@ class BaseDB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
         return zxJDBC
 
 class DB2Dialect_zxjdbc(BaseDB2Dialect_zxjdbc):
-	 jdbc_db_name = 'db2'
+	jdbc_db_name = 'db2'
     jdbc_driver_name = 'com.ibm.db2.jcc.DB2Driver'
     
     def set_isolation_level(self, connection, level):    
