@@ -40,7 +40,7 @@ class DB2ExecutionContext_zxjdbc(_SelectLastRowIDMixin, DB2ExecutionContext):
         cursor.datahandler = self.dialect.DataHandler(cursor.datahandler)
         return cursor
 
-class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
+class BaseDB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
 
     supports_unicode_statements = supports_unicode_binds = \
     returns_unicode_strings = supports_unicode = False
@@ -48,10 +48,7 @@ class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
 
     supports_unicode_statements = False
     supports_sane_rowcount = True
-    supports_char_length = True
-
-    jdbc_db_name = 'db2'
-    jdbc_driver_name = 'com.ibm.db2.jcc.DB2Driver'
+    supports_char_length = True    
 
     statement_compiler = DB2Compiler
     execution_ctx_cls = DB2ExecutionContext_zxjdbc
@@ -83,8 +80,41 @@ class DB2Dialect_zxjdbc(ZxJDBCConnector, DB2Dialect):
         cls.DataHandler = IBM_DB2DataHandler
         return zxJDBC
 
+class DB2Dialect_zxjdbc(BaseDB2Dialect_zxjdbc):
+	jdbc_db_name = 'db2'
+    jdbc_driver_name = 'com.ibm.db2.jcc.DB2Driver'
+    
+    def set_isolation_level(self, connection, level):    
+        if level is  None:
+         level ='CS' 
+        else :
+          if len(level.strip()) < 1:
+            level ='CS'
+        level.upper().replace("-", " ")   
+        if level not in self._isolation_lookup:
+            raise ArgumentError(
+                "Invalid value '%s' for isolation_level. "
+                "Valid isolation levels for %s are %s" %
+                (level, self.name, ", ".join(self._isolation_lookup))
+            )
+        cursor = connection.cursor()
+        cursor.execute("SET CURRENT ISOLATION %s" % level)
+        cursor.execute("COMMIT")
+        cursor.close()
+        
+    def get_isolation_level(self, connection):
+        cursor = connection.cursor()
+        cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
+        val = cursor.fetchone()[0]
+        cursor.close()
+        if util.py3k and isinstance(val, bytes):
+            val = val.decode()
+        return val
+    
+    def reset_isolation_level(self, connection):
+        self.set_isolation_level(connection,'CS')    
 
-class AS400Dialect_zxjdbc(DB2Dialect_zxjdbc):
+class AS400Dialect_zxjdbc(BaseDB2Dialect_zxjdbc):
     jdbc_db_name = 'as400'
     jdbc_driver_name = 'com.ibm.as400.access.AS400JDBCDriver'
 

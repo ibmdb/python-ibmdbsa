@@ -194,6 +194,7 @@ ischema_names = {
     'FLOAT': FLOAT,
     'TIME': TIME,
     'TIMESTAMP': TIMESTAMP,
+    'TIMESTMP': TIMESTAMP,
     'VARCHAR': VARCHAR,
     'LONGVARCHAR': LONGVARCHAR,
     'XML': XML,
@@ -693,8 +694,11 @@ class DB2Dialect(default.DefaultDialect):
     # object which selects between DB2 and AS/400 schemas
     def initialize(self, connection):
         super(DB2Dialect, self).initialize(connection)
-        self.dbms_ver = connection.connection.dbms_ver
-        self.dbms_name = connection.connection.dbms_name
+        
+        self.dbms_ver = None if not hasattr(connection.connection,'dbms_ver') else \
+            connection.connection.dbms_ver
+        self.dbms_name = None if not hasattr(connection.connection,'dbms_name') else \
+            connection.connection.dbms_name
         
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)

@@ -629,6 +629,8 @@ class AS400Reflector(BaseReflector):
         sysconst = self.sys_table_constraints
         syskeyconst = self.sys_key_constraints
 
+        query = sql.select([syskeyconst.c.col])
+
         query = sql.select([syskeyconst.c.colname, sysconst.c.tabname],
                 sql.and_(
                     syskeyconst.c.conschema == sysconst.c.conschema,
@@ -708,3 +710,35 @@ class AS400Reflector(BaseReflector):
                                 'unique': r[1] == 'Y'
                         }
         return [value for key, value in indexes.iteritems()]
+
+    @reflection.cache
+    def get_unique_constraints(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        syskeycol = self.sys_key_constraints
+        sysconst = self.sys_table_constraints        
+
+        query = sql.select([syskeycol.c.conname, syskeycol.c.colname],
+            sql.and_(
+                syskeycol.c.conschema == sysconst.c.conschema,
+                syskeycol.c.conname == sysconst.c.conname,
+                sysconst.c.conschema == current_schema,                
+                sysconst.c.tabschema == current_schema,
+                sysconst.c.tabname == table_name,
+                sysconst.c.contype == 'UNIQUE'              
+            ),
+            order_by=[syskeycol.c.colno]
+        )
+        uniqueConsts = []
+        currConst = None
+        for r in connection.execute(query):
+            if currConst == r[0]:
+                uniqueConsts[-1]['column_names'].append(self.normalize_name(r[1]))
+            else:
+                currConst = r[0]
+                uniqueConsts.append({
+                        'name': self.normalize_name(currConst),
+                        'column_names': [self.normalize_name(r[1])],
+                    })
+        return uniqueConsts
+        

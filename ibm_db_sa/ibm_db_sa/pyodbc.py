@@ -35,6 +35,36 @@ class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
     execution_ctx_cls = DB2ExecutionContext_pyodbc
 
     pyodbc_driver_name = "IBM DB2 ODBC DRIVER"
+    
+    def set_isolation_level(self, connection, level):    
+        if level is  None:
+         level ='CS' 
+        else :
+          if len(level.strip()) < 1:
+            level ='CS'
+        level.upper().replace("-", " ")   
+        if level not in self._isolation_lookup:
+            raise ArgumentError(
+                "Invalid value '%s' for isolation_level. "
+                "Valid isolation levels for %s are %s" %
+                (level, self.name, ", ".join(self._isolation_lookup))
+            )
+        cursor = connection.cursor()
+        cursor.execute("SET CURRENT ISOLATION %s" % level)
+        cursor.execute("COMMIT")
+        cursor.close()
+        
+    def get_isolation_level(self, connection):
+        cursor = connection.cursor()
+        cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
+        val = cursor.fetchone()[0]
+        cursor.close()
+        if util.py3k and isinstance(val, bytes):
+            val = val.decode()
+        return val
+    
+    def reset_isolation_level(self, connection):
+        self.set_isolation_level(connection,'CS')
 
     def create_connect_args(self, url):
         opts = url.translate_connect_args(username='user')
