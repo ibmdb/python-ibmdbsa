@@ -694,8 +694,8 @@ class DB2Dialect(default.DefaultDialect):
     # object which selects between DB2 and AS/400 schemas
     def initialize(self, connection):
         super(DB2Dialect, self).initialize(connection)
-        self.dbms_ver = connection.connection.dbms_ver
-        self.dbms_name = connection.connection.dbms_name
+#        self.dbms_ver = connection.connection.dbms_ver
+#        self.dbms_name = connection.connection.dbms_name
         
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)
