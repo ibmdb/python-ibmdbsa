@@ -10,7 +10,7 @@ Version
 Prerequisites
 --------------
 1. Python 2.5.x or Jython 2.5.x .
-2. SQLAlchemy o.7.3 or above.
+2. SQLAlchemy 0.7.3 or above.
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher
 
 Install and Configuration
@@ -73,3 +73,9 @@ ibm_db_sa for SQLAlchemy was first produced by IBM Inc., targeting version 0.4.
 The library was ported for version 0.6 and 0.7 by Jaimy Azle.
 Port for version 0.8 and modernization of test suite by Mike Bayer.
 
+Contributing to IBM_DB_SA python project
+----------------------------------------
+See CONTRIBUTING
+
+The developer sign-off should include the reference to the DCO in remarks(example below):
+DCO 1.1 Signed-off-by: Random J Developer <random@developer.org>
