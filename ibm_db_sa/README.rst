@@ -75,7 +75,7 @@ Port for version 0.8 and modernization of test suite by Mike Bayer.
 
 Contributing to IBM_DB_SA python project
 ----------------------------------------
-See https://github.com/ibmdb/python-ibmdbsa/tree/master/ibm_db_sa/contributing/CONTRIBUTING.md
+See [CONTRIBUTING] (https://github.com/ibmdb/python-ibmdbsa/tree/master/ibm_db_sa/contributing/CONTRIBUTING.md)
 
 The developer sign-off should include the reference to the DCO in remarks(example below):
 DCO 1.1 Signed-off-by: Random J Developer <random@developer.org>
