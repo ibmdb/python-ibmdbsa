@@ -441,7 +441,7 @@ class DB2Compiler(compiler.SQLCompiler):
         else:
             return self.process(cast.clause)
 
-    def get_select_precolumns(self, select):
+    def get_select_precolumns(self, select,**kwargs):
         if isinstance(select._distinct, str):
             return select._distinct.upper() + " "
         elif select._distinct:
