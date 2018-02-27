@@ -30,7 +30,7 @@ setup(
         ],
          long_description=open(readme).read(),
          platforms='All',
-         install_requires=['sqlalchemy>=0.7.3'],
+         install_requires=['sqlalchemy>=0.7.3','ibm_db>=2.0.0'],
          packages=['ibm_db_sa'],
         entry_points={
          'sqlalchemy.dialects': [
