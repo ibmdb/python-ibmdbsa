@@ -343,7 +343,7 @@ class DB2Compiler(compiler.SQLCompiler):
         return "mod(%s, %s)" % (self.process(binary.left),
                                                 self.process(binary.right))
 
-    def limit_clause(self, select,**kwargs):
+    def limit_clause(self, select):
         if (select._limit is not None) and (select._offset is None):
             return " FETCH FIRST %s ROWS ONLY" % select._limit
         else:
@@ -441,7 +441,7 @@ class DB2Compiler(compiler.SQLCompiler):
         else:
             return self.process(cast.clause)
 
-    def get_select_precolumns(self, select,**kwargs):
+    def get_select_precolumns(self, select):
         if isinstance(select._distinct, str):
             return select._distinct.upper() + " "
         elif select._distinct:
@@ -693,8 +693,8 @@ class DB2Dialect(default.DefaultDialect):
     # object which selects between DB2 and AS/400 schemas
     def initialize(self, connection):
         super(DB2Dialect, self).initialize(connection)
-        self.dbms_ver = connection.connection.dbms_ver
-        self.dbms_name = connection.connection.dbms_name
+        self.dbms_ver = getattr(connection.connection, 'dbms_ver', None)
+        self.dbms_name = getattr(connection.connection, 'dbms_name', None)
         
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)
@@ -759,3 +759,4 @@ IBM_DBExecutionContext = DB2ExecutionContext
 IBM_DBDialect = DB2Dialect
 
 dialect = DB2Dialect
+
