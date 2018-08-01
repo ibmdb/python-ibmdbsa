@@ -338,7 +338,7 @@ class DB2Compiler(compiler.SQLCompiler):
             return ' WITH RS USE AND KEEP SHARE LOCKS'
         else:
             return ''
-
+			
     def visit_mod_binary(self, binary, operator, **kw):
         return "mod(%s, %s)" % (self.process(binary.left),
                                                 self.process(binary.right))
@@ -489,14 +489,17 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         """Checks to see if the DB2 version is at least 10.5.
         This is needed for checking if unique constraints with null columns are supported.
         """
-        if hasattr(dialect, 'dbms_name') and (dialect.dbms_name.find('DB2/') != -1):
-            return self.get_server_version_info(dialect) >= [10, 5]
+
+        dbms_name = getattr(dialect, 'dbms_name', None)
+        if hasattr(dialect, 'dbms_name'):
+           if dbms_name != None and (dbms_name.find('DB2/') != -1):
+                return self.get_server_version_info(dialect) >= [10, 5]
         else:
             return False
 
     def get_column_specification(self, column, **kw):
         col_spec = [self.preparer.format_column(column)]
-        col_spec.append(self.dialect.type_compiler.process(column.type))
+        col_spec.append(self.dialect.type_compiler.process(column.type,type_expression=column))
 
 
         # column-options: "NOT NULL"
@@ -693,8 +696,8 @@ class DB2Dialect(default.DefaultDialect):
     # object which selects between DB2 and AS/400 schemas
     def initialize(self, connection):
         super(DB2Dialect, self).initialize(connection)
-        self.dbms_ver = connection.connection.dbms_ver
-        self.dbms_name = connection.connection.dbms_name
+        self.dbms_ver = getattr(connection.connection, 'dbms_ver', None)
+        self.dbms_name = getattr(connection.connection, 'dbms_name', None)
         
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)

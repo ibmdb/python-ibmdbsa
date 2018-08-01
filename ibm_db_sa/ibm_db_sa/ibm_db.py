@@ -171,7 +171,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 dsn_param.append('PWD=%s' % url.password)
             
             #check for SSL arguments
-            ssl_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash']
+            ssl_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash','SSLServerCertificate']
             query_keys = url.query.keys()
             for key in ssl_keys:
                 for query_key in query_keys:

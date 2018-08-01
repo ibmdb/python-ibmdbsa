@@ -16,14 +16,15 @@
 # | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
 # | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                                    |
 # +--------------------------------------------------------------------------+
-
+import sys
 from sqlalchemy import types as sa_types
 from sqlalchemy import sql, util
 from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
 import re
 import codecs
-
+from future.utils import iteritems
+from sys import version_info
 
 class CoerceUnicode(sa_types.TypeDecorator):
     impl = sa_types.Unicode
@@ -60,7 +61,10 @@ class BaseReflector(object):
             else:
                 name = codecs.decode(name)
         else:
-            name = unicode(name)
+            if version_info[0] < 3:
+                name = unicode(name)
+            else:
+                name = str(name)
         return name
 
     def _get_default_schema_name(self, connection):
@@ -69,8 +73,12 @@ class BaseReflector(object):
                     u'SELECT CURRENT_SCHEMA FROM SYSIBM.SYSDUMMY1').scalar()
         if isinstance(default_schema_name, str):
             default_schema_name = default_schema_name.strip()
-        elif isinstance(default_schema_name, unicode):
-            default_schema_name = default_schema_name.strip().__str__()
+        elif version_info[0] < 3:
+            if isinstance(default_schema_name, unicode):
+                default_schema_name = default_schema_name.strip().__str__()
+            else:
+                if isinstance(default_schema_name, str):
+                    default_schema_name = default_schema_name.strip().__str__()
         return self.normalize_name(default_schema_name)
 
     @property
@@ -364,7 +372,7 @@ class DB2Reflector(BaseReflector):
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
-        return [value for key, value in fschema.iteritems()]
+        return [value for key, value in iteritems(fschema)]
 
 
     @reflection.cache
@@ -660,7 +668,7 @@ class AS400Reflector(BaseReflector):
             )
         fschema = {}
         for r in connection.execute(query):
-            if not fschema.has_key(r[0]):
+            if r[0] not in fschema:
                 referred_schema = self.normalize_name(r[5])
 
                 # if no schema specified and referred schema here is the
@@ -677,7 +685,7 @@ class AS400Reflector(BaseReflector):
             else:
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
-        return [value for key, value in fschema.iteritems()]
+        return [value for key, value in iteritems(fschema)]
 
     # Retrieves a list of index names for a given schema
     @reflection.cache
@@ -707,4 +715,9 @@ class AS400Reflector(BaseReflector):
                                 'column_names': [self.normalize_name(r[2])],
                                 'unique': r[1] == 'Y'
                         }
-        return [value for key, value in indexes.iteritems()]
+        return [value for key, value in iteritems(indexes)]
+		
+    @reflection.cache
+    def get_unique_constraints(self, connection, table_name, schema=None, **kw):
+        uniqueConsts = []
+        return uniqueConsts
