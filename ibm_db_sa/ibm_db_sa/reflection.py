@@ -167,7 +167,7 @@ class DB2Reflector(BaseReflector):
 
     def has_table(self, connection, table_name, schema=None):
         current_schema = self.denormalize_name(
-                            schema or self.default_schema_name)
+                            schema or connection.connection.connection.current_schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         if current_schema:
             whereclause = sql.and_(self.sys_tables.c.tabschema == current_schema,
@@ -179,7 +179,7 @@ class DB2Reflector(BaseReflector):
         return c.first() is not None
 
     def has_sequence(self, connection, sequence_name, schema=None):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         sequence_name = self.denormalize_name(sequence_name)
         if current_schema:
             whereclause = sql.and_(self.sys_sequences.c.seqschema == current_schema,
@@ -201,7 +201,7 @@ class DB2Reflector(BaseReflector):
 
     @reflection.cache
     def get_table_names(self, connection, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         systbl = self.sys_tables
         query = sql.select([systbl.c.tabname]).\
                     where(systbl.c.type == 'T').\
@@ -211,7 +211,7 @@ class DB2Reflector(BaseReflector):
 
     @reflection.cache
     def get_view_names(self, connection, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
 
         query = sql.select([self.sys_views.c.viewname]).\
             where(self.sys_views.c.viewschema == current_schema).\
@@ -221,7 +221,7 @@ class DB2Reflector(BaseReflector):
 
     @reflection.cache
     def get_view_definition(self, connection, viewname, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         viewname = self.denormalize_name(viewname)
 
         query = sql.select([self.sys_views.c.text]).\
@@ -232,7 +232,7 @@ class DB2Reflector(BaseReflector):
 
     @reflection.cache
     def get_columns(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
 
@@ -273,7 +273,7 @@ class DB2Reflector(BaseReflector):
 
     @reflection.cache
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_indexes
         col_finder = re.compile("(\w+)")
@@ -294,7 +294,7 @@ class DB2Reflector(BaseReflector):
     @reflection.cache
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
-        current_schema = self.denormalize_name(schema or default_schema)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or default_schema)
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
@@ -334,7 +334,7 @@ class DB2Reflector(BaseReflector):
     @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
-        current_schema = self.denormalize_name(schema or default_schema)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or default_schema)
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
@@ -376,7 +376,7 @@ class DB2Reflector(BaseReflector):
 
     @reflection.cache
     def get_indexes(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
         query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule, sysidx.c.system_required],
@@ -402,7 +402,7 @@ class DB2Reflector(BaseReflector):
     
     @reflection.cache
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         syskeycol = self.sys_keycoluse
         sysconst = self.sys_tabconst
@@ -555,7 +555,7 @@ class AS400Reflector(BaseReflector):
     # Retrieves a list of table names for a given schema
     @reflection.cache
     def get_table_names(self, connection, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         systbl = self.sys_tables
         query = sql.select([systbl.c.tabname]).\
                 where(systbl.c.tabtype == 'T').\
@@ -588,7 +588,7 @@ class AS400Reflector(BaseReflector):
 
     @reflection.cache
     def get_columns(self, connection, table_name, schema=None, **kw):
-        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
 
@@ -651,7 +651,7 @@ class AS400Reflector(BaseReflector):
     @reflection.cache
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
-        current_schema = self.denormalize_name(schema or default_schema)
+        current_schema = self.denormalize_name(schema or connection.connection.connection.current_schema or default_schema)
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
