@@ -17,7 +17,7 @@
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
 
-__version__ = '0.3.3'
+__version__ = '1.3.3'
 
 from . import ibm_db, pyodbc, base, zxjdbc
 
