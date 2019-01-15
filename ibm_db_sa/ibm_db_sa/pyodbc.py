@@ -124,7 +124,6 @@ class AS400Dialect_pyodbc(PyODBCConnector, DB2Dialect):
                             'System=%s' % keys.pop('host', ''),
                             'DBQ=QGPL']
               connectors.append("PKG=QGPL/DEFAULT(IBM),2,0,1,0,512")
-              connectors.append("CMT=0")
               db_name = keys.pop('database', '')
               if db_name:
                 connectors.append("DATABASE=%s" % db_name)

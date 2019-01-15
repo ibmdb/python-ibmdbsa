@@ -22,6 +22,10 @@ from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
 from sqlalchemy.exc import ArgumentError
 SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
+SQL_TXN_READ_UNCOMMITTED = 1
+SQL_TXN_READ_COMMITTED = 2
+SQL_TXN_REPEATABLE_READ = 4
+SQL_ATTR_TXN_ISOLATION = 108
 
 if SA_Version < [0, 8]:
     from sqlalchemy.engine import base
@@ -108,10 +112,20 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
-        
+    
     _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
                              'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
    
+    _isolation_levels_cli = {'RR': SQL_TXN_SERIALIZABLE, 'REPEATABLE READ': SQL_TXN_SERIALIZABLE, 
+                            'UR': SQL_TXN_READ_UNCOMMITTED, 'UNCOMMITTED READ': SQL_TXN_READ_UNCOMMITTED,
+                             'RS': SQL_TXN_REPEATABLE_READ, 'READ STABILITY': SQL_TXN_REPEATABLE_READ,   
+                             'CS': SQL_TXN_READ_COMMITTED, 'CURSOR STABILITY': SQL_TXN_READ_COMMITTED }
+    
+    _isolation_levels_returned = { value : key for key, value in _isolation_levels_cli.items()}
+
+    def _get_cli_isolation_levels(self, level):
+        return _isolation_levels_cli[level]
+
     def set_isolation_level(self, connection, level):    
         if level is  None:
          level ='CS' 
@@ -125,18 +139,16 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 "Valid isolation levels for %s are %s" %
                 (level, self.name, ", ".join(self._isolation_lookup))
             )
-        cursor = connection.cursor()
-        cursor.execute("SET CURRENT ISOLATION %s" % level)
-        cursor.execute("COMMIT")
-        cursor.close()
+        attrib = {SQL_ATTR_TXN_ISOLATION:_get_cli_isolation_levels(self,level)}
+        res = connection.set_option(attrib)
+
         
     def get_isolation_level(self, connection):
-        cursor = connection.cursor()
-        cursor.execute('SELECT CURRENT ISOLATION FROM sysibm.sysdummy1')
-        val = cursor.fetchone()[0]
-        cursor.close()
-        if util.py3k and isinstance(val, bytes):
-            val = val.decode()
+                
+        attrib = SQL_ATTR_TXN_ISOLATION
+        res = connection.get_option(attrib)
+
+        val = self._isolation_levels_returned[res]
         return val
     
     def reset_isolation_level(self, connection):
