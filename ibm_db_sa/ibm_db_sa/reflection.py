@@ -18,7 +18,7 @@
 # +--------------------------------------------------------------------------+
 import sys
 from sqlalchemy import types as sa_types
-from sqlalchemy import sql, util
+from sqlalchemy import sql, util, join
 from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
 import re
@@ -298,16 +298,20 @@ class DB2Reflector(BaseReflector):
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
-                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
-            sql.and_(
-              sysfkeys.c.fktabschema == current_schema,
-              sysfkeys.c.fktabname == table_name
-            ),
-            order_by=[sysfkeys.c.colno]
-          )
+        systbl = self.sys_tables
+
+        query = sql \
+            .select([sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                     sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                     sysfkeys.c.pkname, sysfkeys.c.pktabschema,
+                     sysfkeys.c.pktabname, sysfkeys.c.pkcolname]) \
+            .select_from(
+                join(systbl, sysfkeys, systbl.c.tabname == sysfkeys.c.pktabname)
+            ) \
+            .where(systbl.c.type == 'T') \
+            .where(systbl.c.tabschema == current_schema) \
+            .where(sysfkeys.c.fktabname == table_name) \
+            .order_by(systbl.c.tabname)
 
         fschema = {}
         for r in connection.execute(query):
