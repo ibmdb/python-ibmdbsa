@@ -25,6 +25,7 @@ SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 SQL_TXN_READ_UNCOMMITTED = 1
 SQL_TXN_READ_COMMITTED = 2
 SQL_TXN_REPEATABLE_READ = 4
+SQL_TXN_SERIALIZABLE = 8
 SQL_ATTR_TXN_ISOLATION = 108
 
 if SA_Version < [0, 8]:
