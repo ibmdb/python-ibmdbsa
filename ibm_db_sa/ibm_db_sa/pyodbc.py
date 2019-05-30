@@ -109,7 +109,7 @@ class AS400Dialect_pyodbc(PyODBCConnector, DB2Dialect):
         connect_args = {}
         for param in ('ansi', 'unicode_results', 'autocommit'):
           if param in keys:
-            connect_args[param] = asbool(keys.pop(param))
+            connect_args[param] = util.asbool(keys.pop(param))
 
         if 'odbc_connect' in keys:
           connectors = [urllib.unquote_plus(keys.pop('odbc_connect'))]
