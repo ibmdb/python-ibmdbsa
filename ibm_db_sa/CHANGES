@@ -1,5 +1,19 @@
 CHANGES
 =======
+2019/05/30
+- Added fix for missing "CURRENT ISOLATION" register
+- Fixed Autocommit not working for pyodbc
+- Fixed NameError: name 'asbool' is not defined python 
+
+2016/08/29
+- Fixed multiple defects mentioned below
+- Add documentation on alchemy url for conncetion over ssl 
+- DB2 on AS400: An unexpected token "ISOLATION" was found on ibm_db_sa/ibm_db.py
+- Getting AttributeError for AS400 
+- name 'unicode' is not defined
+- AttributeError when using pyodbc
+- add capability to the driver to generate query with literals, compile_kwargs={"literal_binds": True} 
+
 2016/08/30
 -Added Support for Python 3.x
 

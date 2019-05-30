@@ -13,8 +13,8 @@
 # | KIND, either express or implied. See the License for the specific        |
 # | language governing permissions and limitations under the License.        |
 # +--------------------------------------------------------------------------+
-# | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi               |
-# | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                                     |
+# | Authors: Alex Pitigoi, Abhigyan Agrawal, Rahul Priyadarshi,Abhinav Radke |
+# | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                       |
 # +--------------------------------------------------------------------------+
 
 from .base import DB2ExecutionContext, DB2Dialect
