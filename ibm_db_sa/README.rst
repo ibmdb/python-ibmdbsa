@@ -54,7 +54,8 @@ For a local socket connection, exclude the "host" and "port" portions::
 
 Supported Databases
 -------------------
-- IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards
+- IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards 
+- IBM Db2 on Cloud
 
 Known Limitations in ibm_db_sa adapter for DB2 databases
 -------------------------------------------------------------
