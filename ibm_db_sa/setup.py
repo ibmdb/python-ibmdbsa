@@ -11,7 +11,7 @@ v.close()
 
 readme = os.path.join(os.path.dirname(__file__), 'README.rst')
 if 'USE_PYODBC' in os.environ and os.environ['USE_PYODBC'] == '1':
-    require = ['sqlalchemy>=0.7.3','pyodbc']
+    require = ['sqlalchemy>=0.7.3']
 else:
     require = ['sqlalchemy>=0.7.3','ibm_db>=2.0.0']
     
@@ -26,6 +26,7 @@ setup(
          url='http://pypi.python.org/pypi/ibm_db_sa/',
          download_url='http://code.google.com/p/ibm-db/downloads/list',
          keywords='sqlalchemy database interface IBM Data Servers DB2 Informix IDS',
+         long_description_content_type='text/markdown',
          classifiers=[
             'Development Status :: 4 - Beta',
             'Intended Audience :: Developers',
