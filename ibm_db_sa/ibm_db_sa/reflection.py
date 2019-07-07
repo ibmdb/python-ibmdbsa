@@ -392,6 +392,8 @@ class DB2Reflector(BaseReflector):
             if r[2] != 'P':
                 if r[2] == 'U' and r[3] != 0:
                     continue
+                if 'sqlnotapplicable' in r[1].lower():
+                    continue
                 indexes.append({
                         'name': self.normalize_name(r[0]),
                         'column_names': [self.normalize_name(col)
