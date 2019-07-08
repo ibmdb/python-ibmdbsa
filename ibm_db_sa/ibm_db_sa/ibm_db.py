@@ -140,7 +140,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 "Valid isolation levels for %s are %s" %
                 (level, self.name, ", ".join(self._isolation_lookup))
             )
-        attrib = {SQL_ATTR_TXN_ISOLATION: self._get_cli_isolation_levels(self,level)}
+        attrib = {SQL_ATTR_TXN_ISOLATION: self._get_cli_isolation_levels(level)}
         res = connection.set_option(attrib)
 
         
