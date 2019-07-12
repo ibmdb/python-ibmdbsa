@@ -150,6 +150,8 @@ class DB2Reflector(BaseReflector):
       Column("SCALE", sa_types.Integer, key="scale"),
       Column("DEFAULT", CoerceUnicode, key="defaultval"),
       Column("NULLS", CoerceUnicode, key="nullable"),
+      Column("KEYSEQ", CoerceUnicode, key="keyseq"),
+      Column("PARTKEYSEQ", CoerceUnicode, key="partkeyseq"),
       Column("IDENTITY", CoerceUnicode, key="identity"),
       Column("GENERATED", CoerceUnicode, key="generated"),
       schema="SYSCAT")
