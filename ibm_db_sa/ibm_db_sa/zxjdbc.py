@@ -33,7 +33,7 @@ from sqlalchemy.connectors.zxJDBC import ZxJDBCConnector
 from .base import _SelectLastRowIDMixin, DB2Dialect, DB2ExecutionContext, DB2Compiler
 from . import reflection as ibm_reflection
 
-class DB2ExecutionContext_zxjdbc(_SelectLastRowIDMixin, DB2ExecutionContext):
+class DB2ExecutionContext_zxjdbc(DB2ExecutionContext):
 
     def create_cursor(self):
         cursor = self._dbapi_connection.cursor()

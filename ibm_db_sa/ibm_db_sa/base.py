@@ -613,17 +613,9 @@ class DB2IdentifierPreparer(compiler.IdentifierPreparer):
     reserved_words = RESERVED_WORDS
     illegal_initial_characters = set(range(0, 10)).union(["_", "$"])
 
-
-class DB2ExecutionContext(default.DefaultExecutionContext):
-    def fire_sequence(self, seq, type_):
-        return self._execute_scalar("SELECT NEXTVAL FOR " +
-                    self.dialect.identifier_preparer.format_sequence(seq) +
-                    " FROM SYSIBM.SYSDUMMY1", type_)
-
 class _SelectLastRowIDMixin(object):
     _select_lastrowid = False
     _lastrowid = None
-
 
     def get_lastrowid(self):
         return self._lastrowid
@@ -647,6 +639,13 @@ class _SelectLastRowIDMixin(object):
             row = self.cursor.fetchall()[0]
             if row[0] is not None:
                 self._lastrowid = int(row[0])
+
+				
+class DB2ExecutionContext(_SelectLastRowIDMixin,default.DefaultExecutionContext):
+    def fire_sequence(self, seq, type_):
+        return self._execute_scalar("SELECT NEXTVAL FOR " +
+                    self.dialect.identifier_preparer.format_sequence(seq) +
+                    " FROM SYSIBM.SYSDUMMY1", type_)
 
 
 class DB2Dialect(default.DefaultDialect):

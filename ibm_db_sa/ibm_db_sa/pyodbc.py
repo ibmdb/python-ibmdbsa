@@ -22,7 +22,7 @@ from sqlalchemy.connectors.pyodbc import PyODBCConnector
 from .base import _SelectLastRowIDMixin, DB2ExecutionContext, DB2Dialect
 from . import reflection as ibm_reflection
 
-class DB2ExecutionContext_pyodbc(_SelectLastRowIDMixin, DB2ExecutionContext):
+class DB2ExecutionContext_pyodbc(DB2ExecutionContext):
     pass
 
 class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
