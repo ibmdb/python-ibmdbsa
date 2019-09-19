@@ -17,7 +17,10 @@
 # | Contributors: Mike Bayer                                                 |
 # +--------------------------------------------------------------------------+
 from sqlalchemy import util
-import urllib
+try:
+    import urllib.parse as urllib
+except ImportError:
+    import urllib
 from sqlalchemy.connectors.pyodbc import PyODBCConnector
 from .base import _SelectLastRowIDMixin, DB2ExecutionContext, DB2Dialect
 from . import reflection as ibm_reflection
