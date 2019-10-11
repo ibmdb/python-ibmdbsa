@@ -1,1 +1,0 @@
-ibm_db_sa/README.rst

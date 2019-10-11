@@ -11,13 +11,23 @@ Prerequisites
 --------------
 1. Install Python 2.7 or newer versions except python 3.3 or Jython 2.5.x .
 2. SQLAlchemy 0.7.3 or above.
+<<<<<<< HEAD:README.md
+3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher.
+```
+   Install ibm_db driver with below commands:
+=======
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher
       Install ibm_db driver with below commands:
+>>>>>>> dc7fb4109ee047eb403375b2e7bb813fc56f2855:ibm_db_sa/README.rst
 	    Linux and Windows: 
 	   	   pip install ibm_db
 	    Mac:
 		   pip install --no-cache-dir ibm_db
+<<<<<<< HEAD:README.md
+```
+=======
 
+>>>>>>> dc7fb4109ee047eb403375b2e7bb813fc56f2855:ibm_db_sa/README.rst
 
 Install and Configuration
 =========================
@@ -46,16 +56,19 @@ Please follow the steps provided to Install "Easy Install" in the link above and
 Connecting
 ----------
 A TCP/IP connection can be specified as the following::
-
+```
 	from sqlalchemy import create_engine
 
 	e = create_engine("db2+ibm_db://user:pass@host[:port]/database")
+```
 
 For a local socket connection, exclude the "host" and "port" portions::
 
+```
 	from sqlalchemy import create_engine
 
 	e = create_engine("db2+ibm_db://user:pass@/database")
+```
 
 Supported Databases
 -------------------
