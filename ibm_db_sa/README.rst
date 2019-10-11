@@ -9,9 +9,15 @@ Version
 
 Prerequisites
 --------------
-1. Python 2.5.x or Jython 2.5.x .
+1. Install Python 2.7 or newer versions except python 3.3 or Jython 2.5.x .
 2. SQLAlchemy 0.7.3 or above.
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher
+      Install ibm_db driver with below commands:
+	    Linux and Windows: 
+	   	   pip install ibm_db
+	    Mac:
+		   pip install --no-cache-dir ibm_db
+
 
 Install and Configuration
 =========================
@@ -21,12 +27,11 @@ Application Kit community portal:
 
 Please follow the steps provided to Install "Easy Install" in the link above and follow up with these additional steps to install IBM_DB_SA:
 
-  1. To install IBM_DB_SA egg component available in the remote repositories
-  (pypi.python.org):
+  1. To install IBM_DB_SA from pypi repository(pypi.python.org):
     Windows:
-      > easy_install ibm_db_sa
+      > pip install ibm_db_sa
     Linux/Unix:
-      $ sudo easy_install ibm_db_sa
+      $ sudo pip install ibm_db_sa
   
   2. To install IBM_DB_SA egg component from the downloaded .egg file
     Windows:
