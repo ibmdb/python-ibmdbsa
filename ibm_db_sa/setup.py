@@ -23,7 +23,7 @@ setup(
          description='SQLAlchemy support for IBM Data Servers',
          author='IBM Application Development Team',
          author_email='opendev@us.ibm.com',
-         url='http://pypi.python.org/pypi/ibm_db_sa/',
+         url='https://github.com/ibmdb/python-ibmdbsa/',
          download_url='http://code.google.com/p/ibm-db/downloads/list',
          keywords='sqlalchemy database interface IBM Data Servers DB2 Informix IDS',
          long_description_content_type='text/markdown',
@@ -32,13 +32,18 @@ setup(
             'Intended Audience :: Developers',
             'License :: OSI Approved :: Apache License 2.0',
             'Operating System :: OS Independent',
+            'Programming Language :: Python :: 2.7',
+            'Programming Language :: Python :: 3.5',
+            'Programming Language :: Python :: 3.6',
+            'Programming Language :: Python :: 3.7',
+            'Programming Language :: Python :: 3.8',
             'Topic :: Databases :: Front-end, middle-tier'
-        ],
+         ],
          long_description=open(readme).read(),
          platforms='All',
          install_requires= require,
          packages=['ibm_db_sa'],
-        entry_points={
+         entry_points={
          'sqlalchemy.dialects': [
                      'db2=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
                      'db2.ibm_db=ibm_db_sa.ibm_db:DB2Dialect_ibm_db',
@@ -55,7 +60,7 @@ setup(
                      'ibm_db_sa.zxjdbc400=ibm_db_sa.zxjdbc:AS400Dialect_zxjdbc',
                      'ibm_db_sa.pyodbc400=ibm_db_sa.pyodbc:AS400Dialect_pyodbc',
                     ]
-       },
-       zip_safe=False,
-       tests_require=['nose >= 0.11'],
+         },
+         zip_safe=False,
+         tests_require=['nose >= 0.11'],
      )
