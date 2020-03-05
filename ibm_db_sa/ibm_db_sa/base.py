@@ -408,6 +408,8 @@ class DB2Compiler(compiler.SQLCompiler):
             return sql_ori
 
     def visit_sequence(self, sequence):
+        if sequence.schema:
+            return "NEXT VALUE FOR %s.%s" % (sequence.schema, sequence.name)
         return "NEXT VALUE FOR %s" % sequence.name
 
     def default_from(self):
