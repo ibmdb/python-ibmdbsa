@@ -183,13 +183,13 @@ class DB2Dialect_ibm_db(DB2Dialect):
                     url.password=(url.password).partition(";")[0]
                 dsn_param.append('PWD=%s' % url.password)
             
-            #check for SSL arguments
-            ssl_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash','SSLServerCertificate']
+            #check for ODBC config keywords
+            cfg_keys = ['CurrentSchema', 'Security', 'SSLClientKeystoredb', 'SSLClientKeystash','SSLServerCertificate']
             query_keys = url.query.keys()
-            for key in ssl_keys:
+            for key in cfg_keys:
                 for query_key in query_keys:
                     if query_key.lower() == key.lower():
-                        dsn_param.append('%(ssl_key)s=%(value)s' % {'ssl_key': key, 'value': url.query[query_key]})
+                        dsn_param.append('%(cfg_key)s=%(value)s' % {'cfg_key': key, 'value': url.query[query_key]})
                         del url.query[query_key]
                         break
                            
