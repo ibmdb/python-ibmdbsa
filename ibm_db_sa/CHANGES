@@ -1,5 +1,10 @@
 CHANGES
 =======
+2020/04/17
+- Fixed NameError: name '_get_cli_isolation_levels' is not defined
+- Added conda recipe for private channel
+- Updated README
+
 2019/05/30
 - Added fix for missing "CURRENT ISOLATION" register
 - Fixed Autocommit not working for pyodbc

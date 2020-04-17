@@ -1,0 +1,46 @@
+{% set name = "ibm-db-sa" %}
+#{% set version = "0.3.5" %}
+{% set setup = load_setup_py_data() %}
+
+package:
+  name: "{{ name|lower }}"
+  version: {{ setup.get('version') }}
+
+source:
+#  url: "https://pypi.io/packages/source/{{ name[0] }}/{{ name }}/{{ name }}-{{ version }}.tar.gz"
+#  sha256: 6e87b3ff98ff9444465ca0f0a97e484baf78986eddf7b2f47a2a80581a8b6d37
+  path: .
+build:
+  number: 0
+  script: "{{ PYTHON }} -m pip install . -vv"
+
+requirements:
+  host:
+    - ibm_db >=2.0.0
+    - pip
+    - python
+    - setuptools
+    - sqlalchemy >=0.7.3
+  run:
+    - ibm_db >=2.0.0
+    - python
+    - setuptools
+    - sqlalchemy >=0.7.3
+
+test:
+  imports:
+    - ibm_db_sa
+  requires:
+    - nose >=0.11
+
+about:
+  home: {{ setup.get('url') }}
+  license: {{ setup.get('license') }}
+  license_file: {{ setup.get('license_file') }}
+  license_family: APACHE
+  summary: {{ setup.get('description') }}
+  doc_url: "https://github.com/MarkusFraKS/python-ibmdbsa"
+
+extra:
+  recipe-maintainers:
+    - MarkusFraKS

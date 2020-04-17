@@ -5,7 +5,15 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.3.5 (2019/05/30)
+0.3.5.1 (2020/04/17) **INOFFICAL** fork based on 0.3.5 (2019/05/30)
+
+Added some bugfixes and conda recipe for private conda channel.
++ Bugfixes from: [MarkusFraKS](https://github.com/MarkusFraKS)
++ Fork: https://github.com/MarkusFraKS/python-ibmdbsa
+
+
++ Original source forked from: https://github.com/ibmdb/python-ibmdbsa
++ Author: IBM Application Development Team <opendev@us.ibm.com>
 
 Prerequisites
 --------------
