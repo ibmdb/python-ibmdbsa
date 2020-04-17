@@ -1,4 +1,4 @@
-{% set name = "ibm-db-sa" %}
+{% set name = "ibm_db_sa" %}
 #{% set version = "0.3.5" %}
 {% set setup = load_setup_py_data() %}
 
@@ -11,7 +11,7 @@ source:
 #  sha256: 6e87b3ff98ff9444465ca0f0a97e484baf78986eddf7b2f47a2a80581a8b6d37
   path: .
 build:
-  number: 2
+  number: 3
   script: "{{ PYTHON }} -m pip install . -vv"
 
 requirements:
