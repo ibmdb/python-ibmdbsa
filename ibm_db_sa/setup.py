@@ -8,7 +8,7 @@ v = open(os.path.join(os.path.dirname(__file__), 'ibm_db_sa', '__init__.py'))
 VERSION = re.compile(r".*__version__ = '(.*?)'", re.S).match(v.read()).group(1)
 v.close()
 
-readme = os.path.join(os.path.dirname(__file__), 'README.rst')
+readme = os.path.join(os.path.dirname(__file__), 'README.md')
 if 'USE_PYODBC' in os.environ and os.environ['USE_PYODBC'] == '1':
     require = ['sqlalchemy>=0.7.3']
 else:
