@@ -133,7 +133,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
         else :
           if len(level.strip()) < 1:
             level ='CS'
-        level.upper().replace("-", " ")   
+        level = level.upper().replace("-", " ").replace("_", " ")
         if level not in self._isolation_lookup:
             raise ArgumentError(
                 "Invalid value '%s' for isolation_level. "
