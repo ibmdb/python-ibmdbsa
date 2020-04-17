@@ -11,19 +11,19 @@ source:
 #  sha256: 6e87b3ff98ff9444465ca0f0a97e484baf78986eddf7b2f47a2a80581a8b6d37
   path: .
 build:
-  number: 0
+  number: 1
   script: "{{ PYTHON }} -m pip install . -vv"
 
 requirements:
   host:
     - ibm_db >=2.0.0
     - pip
-    - python
+    - python {{ python }}
     - setuptools
     - sqlalchemy >=0.7.3
   run:
     - ibm_db >=2.0.0
-    - python
+    - python {{ python }}
     - setuptools
     - sqlalchemy >=0.7.3
 
