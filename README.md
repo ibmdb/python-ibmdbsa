@@ -9,7 +9,7 @@ Version
 
 Prerequisites
 --------------
-1. Install Python 2.7 or newer versions except python 3.3 or Jython 2.5.x .
+1. Install Python 2.7 or Python 3 <= 3.7. The minimum python version supported by driver is python 2.7 and the latest version supported is python 3.7 except version 3.3 as it has reached end-of-life. Jython 2.5.x also not supported.
 2. SQLAlchemy 0.7.3 or above.
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher.
 ```
