@@ -34,7 +34,6 @@ setup(
             'Operating System :: OS Independent',
             'Topic :: Databases :: Front-end, middle-tier'
         ],
-         long_description=open(readme).read(),
          platforms='All',
          install_requires= require,
          packages=['ibm_db_sa'],
