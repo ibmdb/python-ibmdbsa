@@ -640,7 +640,7 @@ class _SelectLastRowIDMixin(object):
             if row[0] is not None:
                 self._lastrowid = int(row[0])
 
-				
+
 class DB2ExecutionContext(_SelectLastRowIDMixin,default.DefaultExecutionContext):
     def fire_sequence(self, seq, type_):
         return self._execute_scalar("SELECT NEXTVAL FOR " +
@@ -697,6 +697,19 @@ class DB2Dialect(default.DefaultDialect):
         super(DB2Dialect, self).initialize(connection)
         self.dbms_ver = getattr(connection.connection, 'dbms_ver', None)
         self.dbms_name = getattr(connection.connection, 'dbms_name', None)
+		#check server type logic here
+        print(self.dbms_name)
+        if(self.dbms_name == 'AS'):
+            _reflector_cls = ibm_reflection.AS400Reflector
+        elif(self.dbms_name == "DB2"):
+            _reflector_cls = ibm_reflection.OS390Reflector
+        elif("DB2/" in self.dbms_name):
+            _reflector_cls = ibm_reflection.DB2Reflector
+        elif("IDS/" in self.dbms_name):
+            _reflector_cls = ibm_reflection.DB2Reflector
+        
+        self._reflector = _reflector_cls(self) 
+
         
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)
