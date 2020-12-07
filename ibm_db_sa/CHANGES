@@ -1,5 +1,11 @@
 CHANGES
 =======
+2020/12/07
+-Added ZOS server support for applications to connect
+-Added Iseries server support for application to connect
+-Add CurrentSchema key word as part of connection string support
+-Added fix for multiple issues
+
 2019/05/30
 - Added fix for missing "CURRENT ISOLATION" register
 - Fixed Autocommit not working for pyodbc

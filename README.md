@@ -5,11 +5,11 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.3.5 (2019/05/30)
+0.3.6 (2020/12/07)
 
 Prerequisites
 --------------
-1. Install Python 2.7 or Python 3 <= 3.7. The minimum python version supported by driver is python 2.7 and the latest version supported is python 3.7 except version 3.3 as it has reached end-of-life. Jython 2.5.x also not supported.
+1. Install Python 2.7 or newer versions except python 3.3 or Jython 2.5.x .
 2. SQLAlchemy 0.7.3 or above.
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher.
 ```
@@ -65,6 +65,8 @@ Supported Databases
 -------------------
 - IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards 
 - IBM Db2 on Cloud
+- IBM Db2 on ZOS
+- IBM Db2 on Iseries
 
 Known Limitations in ibm_db_sa adapter for DB2 databases
 -------------------------------------------------------------

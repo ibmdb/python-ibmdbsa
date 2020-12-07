@@ -5,7 +5,7 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.3.5 (2019/05/30)
+0.3.6 (2020/12/07)
 
 Prerequisites
 --------------
@@ -65,6 +65,8 @@ Supported Databases
 -------------------
 - IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards 
 - IBM Db2 on Cloud
+- IBM Db2 on ZOS
+- IBM Db2 on Iseries
 
 Known Limitations in ibm_db_sa adapter for DB2 databases
 -------------------------------------------------------------
