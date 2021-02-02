@@ -712,6 +712,8 @@ class DB2Dialect(default.DefaultDialect):
             _reflector_cls = ibm_reflection.DB2Reflector
         elif("IDS/" in self.dbms_name):
             _reflector_cls = ibm_reflection.DB2Reflector
+        elif:
+            _reflector_cls = ibm_reflection.DB2Reflector
         
         self._reflector = _reflector_cls(self) 
 
