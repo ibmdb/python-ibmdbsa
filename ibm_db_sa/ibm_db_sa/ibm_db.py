@@ -207,7 +207,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
         if isinstance(ex, (self.dbapi.ProgrammingError,
                                              self.dbapi.OperationalError)):
             connection_errors = ('Connection is not active', 'connection is no longer active',
-                                    'Connection Resource cannot be found', 'SQL30081N'
+                                    'Connection Resource cannot be found', 'SQL30081N',
                                     'CLI0108E', 'CLI0106E', 'SQL1224N')
             for err_msg in connection_errors:
                 if err_msg in str(ex):
