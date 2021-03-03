@@ -301,7 +301,11 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
         return self.visit_FLOAT(type_)
 
     def visit_unicode(self, type_):
-        return self.visit_VARGRAPHIC(type_)
+        check_server = getattr(DB2Dialect,'serverType')
+        if(check_server == "DB2"):
+            return (self.visit_VARGRAPHIC(type_) + " CCSID 1200")
+        else:
+            return self.visit_VARGRAPHIC(type_)
 
     def visit_unicode_text(self, type_):
         return self.visit_LONGVARGRAPHIC(type_)
@@ -640,7 +644,7 @@ class _SelectLastRowIDMixin(object):
             if row[0] is not None:
                 self._lastrowid = int(row[0])
 
-				
+
 class DB2ExecutionContext(_SelectLastRowIDMixin,default.DefaultExecutionContext):
     def fire_sequence(self, seq, type_):
         return self._execute_scalar("SELECT NEXTVAL FOR " +
@@ -685,6 +689,7 @@ class DB2Dialect(default.DefaultDialect):
     execution_ctx_cls = DB2ExecutionContext
 
     _reflector_cls = ibm_reflection.DB2Reflector
+    serverType = ''
 
     def __init__(self, **kw):
         super(DB2Dialect, self).__init__(**kw)
@@ -694,9 +699,22 @@ class DB2Dialect(default.DefaultDialect):
     # reflection: these all defer to an BaseDB2Reflector
     # object which selects between DB2 and AS/400 schemas
     def initialize(self, connection):
-        super(DB2Dialect, self).initialize(connection)
         self.dbms_ver = getattr(connection.connection, 'dbms_ver', None)
         self.dbms_name = getattr(connection.connection, 'dbms_name', None)
+        DB2Dialect.serverType = self.dbms_name
+        super(DB2Dialect, self).initialize(connection)
+		#check server type logic here
+        if(self.dbms_name == 'AS'):
+            _reflector_cls = ibm_reflection.AS400Reflector
+        elif(self.dbms_name == "DB2"):
+            _reflector_cls = ibm_reflection.OS390Reflector
+        elif("DB2/" in self.dbms_name):
+            _reflector_cls = ibm_reflection.DB2Reflector
+        elif("IDS/" in self.dbms_name):
+            _reflector_cls = ibm_reflection.DB2Reflector
+        
+        self._reflector = _reflector_cls(self) 
+
         
     def normalize_name(self, name):
         return self._reflector.normalize_name(name)
