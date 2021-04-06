@@ -10,7 +10,7 @@ Version
 Prerequisites
 --------------
 1. Install Python 2.7 or newer versions except python 3.3 or Jython 2.5.x .
-2. SQLAlchemy 0.7.3 or above.
+2. SQLAlchemy version between 0.7.3 - 1.3.x. (Currently SQLAlchemy above 1.3.x is not supported.)
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher.
 ```
    Install ibm_db driver with below commands:
@@ -43,6 +43,13 @@ Please follow the steps provided to Install "Easy Install" in the link above and
   3. To install IBM_DB_SA from source
     Standard Python setup should be used::
         python setup.py install
+
+  4. In case you want to control the sqlalchemy version use the following commands
+  ```
+    Install SQLAlchemy supported version:
+       pip install sqlalchemy==1.3.23
+       pip install ibm_db_sa
+  ```
 
 Connecting
 ----------
