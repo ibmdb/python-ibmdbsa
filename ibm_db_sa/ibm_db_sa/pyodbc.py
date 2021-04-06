@@ -48,7 +48,7 @@ class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
                 connect_args[param] = util.asbool(keys.pop(param))
 
         if 'odbc_connect' in keys:
-            connectors = [urllib.unquote_plus(keys.pop('odbc_connect'))]
+            connectors = [urllib.parse.unquote_plus(keys.pop('odbc_connect'))]
         else:
             dsn_connection = 'dsn' in keys or \
                                     ('host' in keys and 'database' not in keys)
@@ -112,7 +112,7 @@ class AS400Dialect_pyodbc(PyODBCConnector, DB2Dialect):
             connect_args[param] = util.asbool(keys.pop(param))
 
         if 'odbc_connect' in keys:
-          connectors = [urllib.unquote_plus(keys.pop('odbc_connect'))]
+          connectors = [urllib.parse.unquote_plus(keys.pop('odbc_connect'))]
         else:
           dsn_connection = 'dsn' in keys or \
                                     ('host' in keys and 'database' not in keys)

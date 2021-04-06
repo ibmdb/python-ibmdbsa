@@ -125,7 +125,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
     _isolation_levels_returned = { value : key for key, value in _isolation_levels_cli.items()}
 
     def _get_cli_isolation_levels(self, level):
-        return _isolation_levels_cli[level]
+        return self._isolation_levels_cli[level]
 
     def set_isolation_level(self, connection, level):    
         if level is  None:
@@ -133,14 +133,14 @@ class DB2Dialect_ibm_db(DB2Dialect):
         else :
           if len(level.strip()) < 1:
             level ='CS'
-        level.upper().replace("-", " ")   
+        level = level.upper().replace("-", " ").replace("_", " ")
         if level not in self._isolation_lookup:
             raise ArgumentError(
                 "Invalid value '%s' for isolation_level. "
                 "Valid isolation levels for %s are %s" %
                 (level, self.name, ", ".join(self._isolation_lookup))
             )
-        attrib = {SQL_ATTR_TXN_ISOLATION:_get_cli_isolation_levels(self,level)}
+        attrib = {SQL_ATTR_TXN_ISOLATION: self._get_cli_isolation_levels(level)}
         res = connection.set_option(attrib)
 
         
