@@ -51,6 +51,17 @@ Please follow the steps provided to Install "Easy Install" in the link above and
        pip install ibm_db_sa
   ```
 
+  5. IBM_DB_SA is now available as part of conda-forge channel.
+    Install Instruction from conda-forge channel
+  ```
+    conda install -c conda-forge ibm_db
+    conda install -c conda-forge ibm_db_sa
+  ```
+  #### PLATFORMS SUPPORTED THROUGH CONDA FORGE ####
+    1. WINDOWS
+    2. MAC
+    4. LINUX
+
 Connecting
 ----------
 A TCP/IP connection can be specified as the following::
