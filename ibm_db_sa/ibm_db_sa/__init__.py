@@ -17,9 +17,9 @@
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
 
-__version__ = '0.3.6'
+__version__ = '0.3.7'
 
-from . import ibm_db, pyodbc, base, zxjdbc
+from . import ibm_db, pyodbc, base
 
 
 # default dialect

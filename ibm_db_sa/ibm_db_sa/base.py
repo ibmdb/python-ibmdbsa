@@ -663,7 +663,10 @@ class DB2Dialect(default.DefaultDialect):
     supports_char_length = False
     supports_unicode_statements = False
     supports_unicode_binds = False
-    returns_unicode_strings = False
+    if SA_Version < [1,4]:
+        returns_unicode_strings = False
+    else:
+        returns_unicode_strings = sa_types.String.RETURNS_CONDITIONAL
     postfetch_lastrowid = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = True

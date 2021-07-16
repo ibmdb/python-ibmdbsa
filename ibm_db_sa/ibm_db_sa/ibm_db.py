@@ -50,12 +50,16 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 
 
     def pre_exec(self):
-        # if a single execute, check for outparams
-        if len(self.compiled_parameters) == 1:
-            for bindparam in self.compiled.binds.values():
-                if bindparam.isoutparam:
-                    self._out_parameters = True
-                    break
+        # check for the compiled_parameters attribute in self
+        if(hasattr(self, "compiled_parameters")):
+            # if a single execute, check for outparams
+            if len(self.compiled_parameters) == 1:
+                for bindparam in self.compiled.binds.values():
+                    if bindparam.isoutparam:
+                        self._out_parameters = True
+                        break
+        else:
+            pass
                 
     def get_result_proxy(self):
         if self._callproc_result and self._out_parameters:
