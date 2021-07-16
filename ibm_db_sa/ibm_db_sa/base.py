@@ -703,11 +703,13 @@ class DB2Dialect(default.DefaultDialect):
         self.dbms_name = getattr(connection.connection, 'dbms_name', None)
         DB2Dialect.serverType = self.dbms_name
         super(DB2Dialect, self).initialize(connection)
-		#check server type logic here
+        #check server type logic here
         if(self.dbms_name == 'AS'):
             _reflector_cls = ibm_reflection.AS400Reflector
         elif(self.dbms_name == "DB2"):
             _reflector_cls = ibm_reflection.OS390Reflector
+        elif(self.dbms_name is None):
+            _reflector_cls = ibm_reflection.DB2Reflector
         elif("DB2/" in self.dbms_name):
             _reflector_cls = ibm_reflection.DB2Reflector
         elif("IDS/" in self.dbms_name):
