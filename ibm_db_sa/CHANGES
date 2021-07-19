@@ -1,5 +1,11 @@
 CHANGES
 =======
+2021/07/19
+-add support for sqlalchemy 1.4
+-Missing none check for dbma_name
+-Set issolation level
+-Other bug fixes
+
 2021/03/03
 -issolation level bug fix.
 
