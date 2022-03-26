@@ -25,6 +25,7 @@ import re
 import codecs
 from sys import version_info
 
+
 class CoerceUnicode(sa_types.TypeDecorator):
     impl = sa_types.Unicode
 
@@ -32,6 +33,7 @@ class CoerceUnicode(sa_types.TypeDecorator):
         if isinstance(value, str):
             value = value
         return value
+
 
 class BaseReflector(object):
     def __init__(self, dialect):
@@ -42,7 +44,7 @@ class BaseReflector(object):
     def normalize_name(self, name):
         if isinstance(name, str):
             name = name
-        if name != None:
+        if name is not None:
             return name.lower() if name.upper() == name and \
                not self.identifier_preparer._requires_quotes(name.lower()) \
                else name
@@ -55,7 +57,7 @@ class BaseReflector(object):
                 not self.identifier_preparer._requires_quotes(name.lower()):
             name = name.upper()
         if not self.dialect.supports_unicode_binds:
-            if(isinstance(name, str)):
+            if isinstance(name, str):
                 name = name
             else:
                 name = codecs.decode(name)
@@ -84,6 +86,7 @@ class BaseReflector(object):
     def default_schema_name(self):
         return self.dialect.default_schema_name
 
+
 class DB2Reflector(BaseReflector):
     ischema = MetaData()
 
@@ -103,6 +106,7 @@ class DB2Reflector(BaseReflector):
       Column("OWNERTYPE", CoerceUnicode, key="ownertype"),
       Column("TYPE", CoerceUnicode, key="type"),
       Column("STATUS", CoerceUnicode, key="status"),
+      Column("REMARKS", CoerceUnicode, key="remarks"),
       schema="SYSCAT")
 
     sys_indexes = Table("INDEXES", ischema,
@@ -113,14 +117,14 @@ class DB2Reflector(BaseReflector):
       Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
       Column("SYSTEM_REQUIRED", CoerceUnicode, key="system_required"),
       schema="SYSCAT")
-    
+
     sys_tabconst = Table("TABCONST", ischema,
       Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
       Column("TABNAME", CoerceUnicode, key="tabname"),
       Column("CONSTNAME", CoerceUnicode, key="constname"),
       Column("TYPE", CoerceUnicode, key="type"),
       schema="SYSCAT")
-    
+
     sys_keycoluse = Table("KEYCOLUSE", ischema,
       Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
       Column("TABNAME", CoerceUnicode, key="tabname"),
@@ -165,7 +169,7 @@ class DB2Reflector(BaseReflector):
       Column("SEQNAME", CoerceUnicode, key="seqname"),
       schema="SYSCAT")
 
-    def has_table(self, connection, table_name, schema=None):
+    def has_table(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(
                             schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
@@ -190,6 +194,16 @@ class DB2Reflector(BaseReflector):
         c = connection.execute(s)
         return c.first() is not None
 
+    @reflection.cache
+    def get_sequence_names(self, connection, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        sys_sequence = self.sys_sequences
+        query = sql.select([sys_sequence.c.seqname],
+                           sys_sequence.c.seqschema == current_schema,
+                           order_by=[sys_sequence.c.seqschema, sys_sequence.c.seqname])
+        return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+    @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_schemas
         query = sql.select([sysschema.c.schemaname],
@@ -197,7 +211,6 @@ class DB2Reflector(BaseReflector):
             order_by=[sysschema.c.schemaname]
         )
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
-
 
     @reflection.cache
     def get_table_names(self, connection, schema=None, **kw):
@@ -208,6 +221,18 @@ class DB2Reflector(BaseReflector):
                     where(systbl.c.tabschema == current_schema).\
                     order_by(systbl.c.tabname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+    @reflection.cache
+    def get_table_comment(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        systbl = self.sys_tables
+        query = sql.select([systbl.c.remarks]). \
+            where(systbl.c.type == 'T'). \
+            where(systbl.c.tabschema == current_schema). \
+            where(systbl.c.tabname == table_name)
+        c = connection.execute(query)
+        return c.first()
 
     @reflection.cache
     def get_view_names(self, connection, schema=None, **kw):
@@ -272,6 +297,29 @@ class DB2Reflector(BaseReflector):
         return sa_columns
 
     @reflection.cache
+    def get_pk_constraint(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        sysindexes = self.sys_indexes
+        col_finder = re.compile("(\w+)")
+        query = sql.select([sysindexes.c.colnames, sysindexes.c.indname],
+                           sql.and_(
+                               sysindexes.c.tabschema == current_schema,
+                               sysindexes.c.tabname == table_name,
+                               sysindexes.c.uniquerule == 'P'),
+                           order_by=[sysindexes.c.tabschema, sysindexes.c.tabname])
+        pk_columns = []
+        pk_name = None
+        for r in connection.execute(query):
+            cols = col_finder.findall(r[0])
+            pk_columns.extend(cols)
+            if not pk_name:
+                pk_name = self.normalize_name(r[1])
+
+        return {"constrained_columns": [self.normalize_name(col) for col in pk_columns],
+                "name": pk_name}
+
+    @reflection.cache
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
@@ -330,7 +378,7 @@ class DB2Reflector(BaseReflector):
                 fschema[r[0]]['constrained_columns'].append(self.normalize_name(r[3]))
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return [value for key, value in fschema.items()]
-    
+
     @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
@@ -373,19 +421,15 @@ class DB2Reflector(BaseReflector):
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return [value for key, value in fschema.items()]
 
-
     @reflection.cache
     def get_indexes(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
-        query = sql.select([sysidx.c.indname, sysidx.c.colnames, sysidx.c.uniquerule, sysidx.c.system_required],
-            sql.and_(
-              sysidx.c.tabschema == current_schema,
-              sysidx.c.tabname == table_name
-            ),
-            order_by=[sysidx.c.tabname]
-          )
+        query = sql.select([sysidx.c.indname, sysidx.c.colnames,
+                            sysidx.c.uniquerule, sysidx.c.system_required],
+                           sql.and_(sysidx.c.tabschema == current_schema,sysidx.c.tabname == table_name),
+                           order_by=[sysidx.c.tabname])
         indexes = []
         col_finder = re.compile("(\w+)")
         for r in connection.execute(query):
@@ -399,7 +443,7 @@ class DB2Reflector(BaseReflector):
                         'unique': r[2] == 'U'
                     })
         return indexes
-    
+
     @reflection.cache
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
@@ -427,6 +471,7 @@ class DB2Reflector(BaseReflector):
                         'column_names': [self.normalize_name(r[1])],
                     })
         return uniqueConsts
+
 
 class AS400Reflector(BaseReflector):
 
@@ -514,7 +559,7 @@ class AS400Reflector(BaseReflector):
       Column("SEQUENCE_NAME", CoerceUnicode, key="seqname"),
       schema="QSYS2")
 
-    def has_table(self, connection, table_name, schema=None):
+    def has_table(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(
                                 schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
@@ -541,6 +586,18 @@ class AS400Reflector(BaseReflector):
         s = sql.select([self.sys_sequences.c.seqname], whereclause)
         c = connection.execute(s)
         return c.first() is not None
+
+    def get_table_comment(self, connection, table_name, schema=None, **kw):
+        raise NotImplementedError()
+
+    @reflection.cache
+    def get_sequence_names(self, connection, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        sys_sequence = self.sys_sequences
+        query = sql.select([sys_sequence.c.seqname],
+                           sys_sequence.c.seqschema == current_schema,
+                           order_by=[sys_sequence.c.seqschema, sys_sequence.c.seqname])
+        return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
     def get_schema_names(self, connection, **kw):
@@ -629,6 +686,31 @@ class AS400Reflector(BaseReflector):
         return sa_columns
 
     @reflection.cache
+    def get_pk_constraint(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(
+            schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        sysconst = self.sys_table_constraints
+        syskeyconst = self.sys_key_constraints
+
+        query = sql.select([syskeyconst.c.colname, sysconst.c.tabname, sysconst.c.conname],
+                           sql.and_(
+                               syskeyconst.c.conschema == sysconst.c.conschema,
+                               syskeyconst.c.conname == sysconst.c.conname,
+                               sysconst.c.tabschema == current_schema,
+                               sysconst.c.tabname == table_name,
+                               sysconst.c.contype == 'PRIMARY KEY'
+                           ), order_by=[syskeyconst.c.colno])
+
+        pk_columns = []
+        pk_name = None
+        for key in connection.execute(query):
+            pk_columns.append(self.normalize_name(key[0]))
+            if not pk_name:
+                pk_name = self.normalize_name(key[2])
+        return {"constrained_columns": pk_columns, "name": pk_name}
+
+    @reflection.cache
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(
                                     schema or self.default_schema_name)
@@ -715,11 +797,12 @@ class AS400Reflector(BaseReflector):
                                 'unique': r[1] == 'Y'
                         }
         return [value for key, value in indexes.items()]
-		
+
     @reflection.cache
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
         uniqueConsts = []
         return uniqueConsts
+
 
 class OS390Reflector(BaseReflector):
     ischema = MetaData()
@@ -740,7 +823,7 @@ class OS390Reflector(BaseReflector):
         Column("TYPE", CoerceUnicode, key="type"),
         Column("STATUS", CoerceUnicode, key="status"),
         schema="SYSIBM")
-    
+
     sys_indexes = Table("SYSINDEXES", ischema,
         Column("CREATOR", CoerceUnicode, key="tabschema"),
         Column("TBNAME", CoerceUnicode, key="tabname"),
@@ -748,7 +831,7 @@ class OS390Reflector(BaseReflector):
         Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
         Column("IBMREQD", CoerceUnicode, key="system_required"),
         schema="SYSIBM")
-        
+
     sys_tabconst = Table("SYSTABCONST", ischema,
         Column("TBCREATOR", CoerceUnicode, key="tabschema"),
         Column("TBNAME", CoerceUnicode, key="tabname"),
@@ -804,8 +887,7 @@ class OS390Reflector(BaseReflector):
         Column("NAME", CoerceUnicode, key="seqname"),
         schema="SYSIBM")
 
-
-    def has_table(self, connection, table_name, schema=None):
+    def has_table(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(
                             schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
@@ -830,13 +912,25 @@ class OS390Reflector(BaseReflector):
         c = connection.execute(s)
         return c.first() is not None
 
+    @reflection.cache
+    def get_sequence_names(self, connection, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        sys_sequence = self.sys_sequences
+        query = sql.select([sys_sequence.c.seqname],
+                           sys_sequence.c.seqschema == current_schema,
+                           order_by=[sys_sequence.c.seqschema, sys_sequence.c.seqname])
+        return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+    @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_tables
         query = sql.select([sysschema.c.tabschema],
-        sql.not_(sysschema.c.tabschema.like('SYS%')),
-        distinct=[sysschema.c.tabschema]
-        )
+                           sql.not_(sysschema.c.tabschema.like('SYS%')),
+                           distinct=[sysschema.c.tabschema])
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
+
+    def get_table_comment(self, connection, table_name, schema=None, **kw):
+        raise NotImplementedError()
 
     @reflection.cache
     def get_table_names(self, connection, schema=None, **kw):
@@ -911,6 +1005,24 @@ class OS390Reflector(BaseReflector):
         return sa_columns
 
     @reflection.cache
+    def get_pk_constraint(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        sysindexes = self.sys_columns
+        col_finder = re.compile("(\w+)")
+        query = sql.select([sysindexes.c.colname],
+                           sql.and_(
+                               sysindexes.c.tabschema == current_schema,
+                               sysindexes.c.tabname == table_name,
+                               sysindexes.c.keyseq > 0),
+                           order_by=[sysindexes.c.tabschema, sysindexes.c.tabname])
+        pk_columns = []
+        for r in connection.execute(query):
+            cols = col_finder.findall(r[0])
+            pk_columns.extend(cols)
+        return {"constrained_columns": [self.normalize_name(col) for col in pk_columns], "name": None}
+
+    @reflection.cache
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
@@ -977,7 +1089,6 @@ class OS390Reflector(BaseReflector):
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return [value for key, value in fschema.items()]
 
-    
     @reflection.cache
     def get_incoming_foreign_keys(self, connection, table_name, schema=None, **kw):
         default_schema = self.default_schema_name
@@ -1027,7 +1138,6 @@ class OS390Reflector(BaseReflector):
                 fschema[r[0]]['referred_columns'].append(self.normalize_name(r[7]))
         return [value for key, value in fschema.items()]
 
-    
     @reflection.cache
     def get_indexes(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
@@ -1057,7 +1167,6 @@ class OS390Reflector(BaseReflector):
                     })
         return indexes
 
-
     @reflection.cache
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
@@ -1086,4 +1195,3 @@ class OS390Reflector(BaseReflector):
                     })
         return uniqueConsts
 
-    

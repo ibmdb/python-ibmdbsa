@@ -21,6 +21,7 @@ from .base import DB2ExecutionContext, DB2Dialect
 from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
 from sqlalchemy.exc import ArgumentError
+
 SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 SQL_TXN_READ_UNCOMMITTED = 1
 SQL_TXN_READ_COMMITTED = 2
@@ -32,6 +33,7 @@ if SA_Version < [0, 8]:
     from sqlalchemy.engine import base
 else:
     from sqlalchemy.engine import result as _result
+
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
     def result_processor(self, dialect, coltype):
@@ -48,10 +50,9 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
     def get_lastrowid(self):
         return self.cursor.last_identity_val
 
-
     def pre_exec(self):
         # check for the compiled_parameters attribute in self
-        if(hasattr(self, "compiled_parameters")):
+        if (hasattr(self, "compiled_parameters")):
             # if a single execute, check for outparams
             if len(self.compiled_parameters) == 1:
                 for bindparam in self.compiled.binds.values():
@@ -60,7 +61,7 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
                         break
         else:
             pass
-                
+
     def get_result_proxy(self):
         if self._callproc_result and self._out_parameters:
             if SA_Version < [0, 8]:
@@ -68,12 +69,12 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
             else:
                 result = _result.ResultProxy(self)
             result.out_parameters = {}
-            
+
             for bindparam in self.compiled.binds.values():
                 if bindparam.isoutparam:
                     name = self.compiled.bind_names[bindparam]
                     result.out_parameters[name] = self._callproc_result[self.compiled.positiontup.index(name)]
-            
+
             return result
         else:
             if SA_Version < [0, 8]:
@@ -81,9 +82,9 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
             else:
                 result = _result.ResultProxy(self)
             return result
-         
-class DB2Dialect_ibm_db(DB2Dialect):
 
+
+class DB2Dialect_ibm_db(DB2Dialect):
     driver = 'ibm_db_sa'
     supports_unicode_statements = True
     supports_sane_rowcount = True
@@ -117,26 +118,26 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
-    
-    _isolation_lookup = set(['READ STABILITY','RS', 'UNCOMMITTED READ','UR',
-                             'CURSOR STABILITY','CS', 'REPEATABLE READ','RR'])
-   
-    _isolation_levels_cli = {'RR': SQL_TXN_SERIALIZABLE, 'REPEATABLE READ': SQL_TXN_SERIALIZABLE, 
-                            'UR': SQL_TXN_READ_UNCOMMITTED, 'UNCOMMITTED READ': SQL_TXN_READ_UNCOMMITTED,
-                             'RS': SQL_TXN_REPEATABLE_READ, 'READ STABILITY': SQL_TXN_REPEATABLE_READ,   
-                             'CS': SQL_TXN_READ_COMMITTED, 'CURSOR STABILITY': SQL_TXN_READ_COMMITTED }
-    
-    _isolation_levels_returned = { value : key for key, value in _isolation_levels_cli.items()}
+
+    _isolation_lookup = set(['READ STABILITY', 'RS', 'UNCOMMITTED READ', 'UR',
+                             'CURSOR STABILITY', 'CS', 'REPEATABLE READ', 'RR'])
+
+    _isolation_levels_cli = {'RR': SQL_TXN_SERIALIZABLE, 'REPEATABLE READ': SQL_TXN_SERIALIZABLE,
+                             'UR': SQL_TXN_READ_UNCOMMITTED, 'UNCOMMITTED READ': SQL_TXN_READ_UNCOMMITTED,
+                             'RS': SQL_TXN_REPEATABLE_READ, 'READ STABILITY': SQL_TXN_REPEATABLE_READ,
+                             'CS': SQL_TXN_READ_COMMITTED, 'CURSOR STABILITY': SQL_TXN_READ_COMMITTED}
+
+    _isolation_levels_returned = {value: key for key, value in _isolation_levels_cli.items()}
 
     def _get_cli_isolation_levels(self, level):
         return self._isolation_levels_cli[level]
 
-    def set_isolation_level(self, connection, level):    
-        if level is  None:
-         level ='CS' 
-        else :
-          if len(level.strip()) < 1:
-            level ='CS'
+    def set_isolation_level(self, connection, level):
+        if level is None:
+            level = 'CS'
+        else:
+            if len(level.strip()) < 1:
+                level = 'CS'
         level = level.upper().replace("-", " ").replace("_", " ")
         if level not in self._isolation_lookup:
             raise ArgumentError(
@@ -147,18 +148,17 @@ class DB2Dialect_ibm_db(DB2Dialect):
         attrib = {SQL_ATTR_TXN_ISOLATION: self._get_cli_isolation_levels(level)}
         res = connection.set_option(attrib)
 
-        
     def get_isolation_level(self, connection):
-                
+
         attrib = SQL_ATTR_TXN_ISOLATION
         res = connection.get_option(attrib)
 
         val = self._isolation_levels_returned[res]
         return val
-    
+
     def reset_isolation_level(self, connection):
-        self.set_isolation_level(connection,'CS')
-        
+        self.set_isolation_level(connection, 'CS')
+
     def create_connect_args(self, url):
         # DSN support through CLI configuration (../cfg/db2cli.ini),
         # while 2 connection attributes are mandatory: database alias
@@ -171,52 +171,54 @@ class DB2Dialect_ibm_db(DB2Dialect):
             dsn = url.database
             uid = url.username
             pwd = url.password
-            return ((dsn, uid, pwd, '', ''), {})
+            return (dsn, uid, pwd, '', ''), {}
         else:
             # Full URL string support for connection to remote data servers
-            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}']
-            dsn_param.append('DATABASE=%s' % url.database)
-            dsn_param.append('HOSTNAME=%s' % url.host)
-            dsn_param.append('PROTOCOL=TCPIP')
+            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}',
+                         'DATABASE=%s' % url.database,
+                         'HOSTNAME=%s' % url.host,
+                         'PROTOCOL=TCPIP']
             if url.port:
                 dsn_param.append('PORT=%s' % url.port)
             if url.username:
                 dsn_param.append('UID=%s' % url.username)
             if url.password:
                 if ';' in url.password:
-                    url.password=(url.password).partition(";")[0]
+                    url.password = (url.password).partition(";")[0]
                 dsn_param.append('PWD=%s' % url.password)
-            
-            #check for connection arguments
-            connection_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash','SSLServerCertificate','CurrentSchema']
+
+            # check for connection arguments
+            connection_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash', 'SSLServerCertificate',
+                               'CurrentSchema']
             query_keys = url.query.keys()
             for key in connection_keys:
                 for query_key in query_keys:
                     if query_key.lower() == key.lower():
-                        dsn_param.append('%(connection_key)s=%(value)s' % {'connection_key': key, 'value': url.query[query_key]})
+                        dsn_param.append(
+                            '%(connection_key)s=%(value)s' % {'connection_key': key, 'value': url.query[query_key]})
                         del url.query[query_key]
                         break
-                           
-            dsn = ';'.join(dsn_param)      
+
+            dsn = ';'.join(dsn_param)
             dsn += ';'
-            return ((dsn, url.username, '', '', ''), {})
+            return (dsn, url.username, '', '', ''), {}
 
     # Retrieves current schema for the specified connection object
     def _get_default_schema_name(self, connection):
         return self.normalize_name(connection.connection.get_current_schema())
 
-
     # Checks if the DB_API driver error indicates an invalid connection
     def is_disconnect(self, ex, connection, cursor):
         if isinstance(ex, (self.dbapi.ProgrammingError,
-                                             self.dbapi.OperationalError)):
+                           self.dbapi.OperationalError)):
             connection_errors = ('Connection is not active', 'connection is no longer active',
-                                    'Connection Resource cannot be found', 'SQL30081N',
-                                    'CLI0108E', 'CLI0106E', 'SQL1224N')
+                                 'Connection Resource cannot be found', 'SQL30081N',
+                                 'CLI0108E', 'CLI0106E', 'SQL1224N')
             for err_msg in connection_errors:
                 if err_msg in str(ex):
                     return True
         else:
             return False
+
 
 dialect = DB2Dialect_ibm_db
