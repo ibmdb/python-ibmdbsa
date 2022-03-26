@@ -115,7 +115,7 @@ class DB2Reflector(BaseReflector):
       Column("INDNAME", CoerceUnicode, key="indname"),
       Column("COLNAMES", CoerceUnicode, key="colnames"),
       Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
-      Column("SYSTEM_REQUIRED", CoerceUnicode, key="system_required"),
+      Column("SYSTEM_REQUIRED", sa_types.SMALLINT, key="system_required"),
       schema="SYSCAT")
 
     sys_tabconst = Table("TABCONST", ischema,
@@ -232,7 +232,7 @@ class DB2Reflector(BaseReflector):
             where(systbl.c.tabschema == current_schema). \
             where(systbl.c.tabname == table_name)
         c = connection.execute(query)
-        return c.first()
+        return {'text': c.first()}
 
     @reflection.cache
     def get_view_names(self, connection, schema=None, **kw):
@@ -829,7 +829,7 @@ class OS390Reflector(BaseReflector):
         Column("TBNAME", CoerceUnicode, key="tabname"),
         Column("NAME", CoerceUnicode, key="indname"),
         Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
-        Column("IBMREQD", CoerceUnicode, key="system_required"),
+        Column("IBMREQD", sa_types.SMALLINT, key="system_required"),
         schema="SYSIBM")
 
     sys_tabconst = Table("SYSTABCONST", ischema,
