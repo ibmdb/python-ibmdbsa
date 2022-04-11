@@ -675,6 +675,7 @@ class DB2Dialect(default.DefaultDialect):
     supports_sane_multi_rowcount = True
     supports_native_decimal = False
     supports_native_boolean = False
+    supports_statement_cache = False
     preexecute_sequences = False
     supports_alter = True
     supports_sequences = True
