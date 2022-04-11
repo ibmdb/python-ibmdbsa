@@ -156,6 +156,7 @@ class DB2Reflector(BaseReflector):
       Column("NULLS", CoerceUnicode, key="nullable"),
       Column("IDENTITY", CoerceUnicode, key="identity"),
       Column("GENERATED", CoerceUnicode, key="generated"),
+      Column("REMARKS", CoerceUnicode, key="remarks"),
       schema="SYSCAT")
 
     sys_views = Table("VIEWS", ischema,
@@ -264,7 +265,8 @@ class DB2Reflector(BaseReflector):
         query = sql.select([syscols.c.colname, syscols.c.typename,
                             syscols.c.defaultval, syscols.c.nullable,
                             syscols.c.length, syscols.c.scale,
-                            syscols.c.identity, syscols.c.generated],
+                            syscols.c.identity, syscols.c.generated, 
+                            syscols.c.remarks],
               sql.and_(
                   syscols.c.tabschema == current_schema,
                   syscols.c.tabname == table_name
@@ -293,6 +295,7 @@ class DB2Reflector(BaseReflector):
                     'nullable': r[3] == 'Y',
                     'default': r[2] or None,
                     'autoincrement': (r[6] == 'Y') and (r[7] != ' '),
+                    'comment': r[8] or None,
                 })
         return sa_columns
 
@@ -518,6 +521,7 @@ class AS400Reflector(BaseReflector):
       Column("HAS_DEFAULT", CoerceUnicode, key="hasdef"),
       Column("IS_IDENTITY", CoerceUnicode, key="isid"),
       Column("IDENTITY_GENERATION", CoerceUnicode, key="idgenerate"),
+      Column("LONG_COMMENT", CoerceUnicode, key="remark"),
       schema="QSYS2")
 
     sys_indexes = Table("SYSINDEXES", ischema,
@@ -653,7 +657,8 @@ class AS400Reflector(BaseReflector):
                                 syscols.c.typename,
                                 syscols.c.defaultval, syscols.c.nullable,
                                 syscols.c.length, syscols.c.scale,
-                                syscols.c.isid, syscols.c.idgenerate],
+                                syscols.c.isid, syscols.c.idgenerate, 
+                                syscols.c.remark],
                     sql.and_(
                             syscols.c.tabschema == current_schema,
                             syscols.c.tabname == table_name
@@ -682,6 +687,7 @@ class AS400Reflector(BaseReflector):
                     'nullable': r[3] == 'Y',
                     'default': r[2],
                     'autoincrement': (r[6] == 'YES') and (r[7] != None),
+                    'comment': r[8] or None,
                 })
         return sa_columns
 
@@ -874,6 +880,7 @@ class OS390Reflector(BaseReflector):
         Column("NULLS", CoerceUnicode, key="nullable"),
         Column("GENERATED_ATTR", CoerceUnicode, key="generated"),
         Column("KEYSEQ", sa_types.Integer, key="keyseq"),
+        Column("REMARKS", sa_types.Integer, key="remark"),
         schema="SYSIBM")
 
     sys_views = Table("SYSVIEWS", ischema,
@@ -972,7 +979,7 @@ class OS390Reflector(BaseReflector):
         query = sql.select([syscols.c.colname, syscols.c.typename,
                             syscols.c.defaultval, syscols.c.nullable,
                             syscols.c.length, syscols.c.scale,
-                            syscols.c.generated],
+                            syscols.c.generated, syscols.c.remark],
               sql.and_(
                   syscols.c.tabschema == current_schema,
                   syscols.c.tabname == table_name
@@ -1001,6 +1008,7 @@ class OS390Reflector(BaseReflector):
                     'nullable': r[3] == 'Y',
                     'default': r[2] or None,
                     'autoincrement': (r[2] == 'J') and (r[2] != ' ') ,
+                    'comment': r[7] or None,
                 })
         return sa_columns
 
