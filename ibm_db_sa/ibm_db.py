@@ -87,6 +87,7 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 class DB2Dialect_ibm_db(DB2Dialect):
     driver = 'ibm_db_sa'
     supports_unicode_statements = True
+    supports_statement_cache = False
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = False
     supports_native_decimal = False
