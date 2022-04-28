@@ -719,6 +719,8 @@ class DB2Dialect(default.DefaultDialect):
             _reflector_cls = ibm_reflection.AS400Reflector
         elif self.dbms_name == "DB2":
             _reflector_cls = ibm_reflection.OS390Reflector
+        elif(self.dbms_name is None):
+            _reflector_cls = ibm_reflection.DB2Reflector
         elif "DB2/" in self.dbms_name:
             _reflector_cls = ibm_reflection.DB2Reflector
         elif "IDS/" in self.dbms_name:
