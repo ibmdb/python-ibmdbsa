@@ -1,5 +1,11 @@
 CHANGES
 =======
+2022/05/17
+-autoload bug fix with SQLAlchemy 1.4.x
+-remove warning message while connection
+-add columns reflection with comments
+-other bug fixes reported
+
 2021/07/19
 -add support for sqlalchemy 1.4
 -Missing none check for dbma_name

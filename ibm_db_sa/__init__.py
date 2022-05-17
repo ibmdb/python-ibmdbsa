@@ -17,7 +17,7 @@
 # | Contributors: Jaimy Azle, Mike Bayer                                     |
 # +--------------------------------------------------------------------------+
 
-__version__ = '0.3.7'
+__version__ = '0.3.8'
 
 from . import ibm_db, pyodbc, base
 
