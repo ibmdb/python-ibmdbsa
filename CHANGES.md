@@ -1,25 +1,25 @@
 CHANGES
 =======
 2022/05/17
--autoload bug fix with SQLAlchemy 1.4.x
--remove warning message while connection
--add columns reflection with comments
--other bug fixes reported
+- autoload bug fix with SQLAlchemy 1.4.x
+- remove warning message while connection
+- add columns reflection with comments
+- other bug fixes reported
 
 2021/07/19
--add support for sqlalchemy 1.4
--Missing none check for dbma_name
--Set issolation level
--Other bug fixes
+- add support for sqlalchemy 1.4
+- Missing none check for dbma_name
+- Set issolation level
+- Other bug fixes
 
 2021/03/03
--issolation level bug fix.
+- issolation level bug fix.
 
 2020/12/07
--Added ZOS server support for applications to connect
--Added Iseries server support for application to connect
--Add CurrentSchema key word as part of connection string support
--Added fix for multiple issues
+- Added ZOS server support for applications to connect
+- Added Iseries server support for application to connect
+- Add CurrentSchema key word as part of connection string support
+- Added fix for multiple issues
 
 2019/05/30
 - Added fix for missing "CURRENT ISOLATION" register
