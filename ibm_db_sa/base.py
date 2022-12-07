@@ -408,9 +408,9 @@ class DB2Compiler(compiler.SQLCompiler):
             sql = '%s, ( ROW_NUMBER() OVER() ) AS "%s" FROM ( %s ) AS M' % (sql_sel, __rownum, sql_pri)
             sql = '%s FROM ( %s ) Z WHERE' % (sql_sel, sql)
 
-            if offset is not 0:
+            if offset != 0:
                 sql = '%s "%s" > %d' % (sql, __rownum, offset)
-            if offset is not 0 and limit is not None:
+            if offset != 0 and limit is not None:
                 sql = '%s AND ' % (sql)
             if limit is not None:
                 sql = '%s "%s" <= %d' % (sql, __rownum, offset + limit)
