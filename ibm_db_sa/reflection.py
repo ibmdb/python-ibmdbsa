@@ -154,6 +154,8 @@ class DB2Reflector(BaseReflector):
       Column("SCALE", sa_types.Integer, key="scale"),
       Column("DEFAULT", CoerceUnicode, key="defaultval"),
       Column("NULLS", CoerceUnicode, key="nullable"),
+      Column("KEYSEQ", CoerceUnicode, key="keyseq"),
+      Column("PARTKEYSEQ", CoerceUnicode, key="partkeyseq"),
       Column("IDENTITY", CoerceUnicode, key="identity"),
       Column("GENERATED", CoerceUnicode, key="generated"),
       Column("REMARKS", CoerceUnicode, key="remarks"),
@@ -326,15 +328,15 @@ class DB2Reflector(BaseReflector):
     def get_primary_keys(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
-        sysindexes = self.sys_indexes
+        syscols = self.sys_columns
         col_finder = re.compile("(\w+)")
-        query = sql.select([sysindexes.c.colnames],
+        query = sql.select([syscols.c.colname],
               sql.and_(
-                  sysindexes.c.tabschema == current_schema,
-                  sysindexes.c.tabname == table_name,
-                  sysindexes.c.uniquerule == 'P'
+                  syscols.c.tabschema == current_schema,
+                  syscols.c.tabname == table_name,
+                  syscols.c.keyseq > 0
                 ),
-              order_by=[sysindexes.c.tabschema, sysindexes.c.tabname]
+              order_by=[syscols.c.tabschema, syscols.c.tabname]
             )
         pk_columns = []
         for r in connection.execute(query):
@@ -440,6 +442,8 @@ class DB2Reflector(BaseReflector):
         for r in connection.execute(query):
             if r[2] != 'P':
                 if r[2] == 'U' and r[3] != 0:
+                    continue
+                if 'sqlnotapplicable' in r[1].lower():
                     continue
                 indexes.append({
                         'name': self.normalize_name(r[0]),
