@@ -95,8 +95,8 @@ class AS400Dialect_pyodbc(PyODBCConnector, DB2Dialect):
     supports_char_length = True
     supports_native_decimal = False
 
-    pyodbc_driver_name = "iSeries Access ODBC Driver"
-
+#    pyodbc_driver_name = "iSeries Access ODBC Driver"
+    pyodbc_driver_name ="IBM i Access ODBC Driver"
     _reflector_cls = ibm_reflection.AS400Reflector
 
     def create_connect_args(self, url):
