@@ -206,6 +206,7 @@ ischema_names = {
     'FLOAT': FLOAT,
     'TIME': TIME,
     'TIMESTAMP': TIMESTAMP,
+    'TIMESTMP': TIMESTAMP,
     'VARCHAR': VARCHAR,
     'LONGVARCHAR': LONGVARCHAR,
     'XML': XML,

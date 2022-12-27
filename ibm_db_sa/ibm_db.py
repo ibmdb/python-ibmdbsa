@@ -175,8 +175,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
             return (dsn, uid, pwd, '', ''), {}
         else:
             # Full URL string support for connection to remote data servers
-            dsn_param = ['DRIVER={IBM DB2 ODBC DRIVER}',
-                         'DATABASE=%s' % url.database,
+            dsn_param = ['DATABASE=%s' % url.database,
                          'HOSTNAME=%s' % url.host,
                          'PROTOCOL=TCPIP']
             if url.port:
