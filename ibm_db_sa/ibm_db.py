@@ -197,7 +197,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
                     if query_key.lower() == key.lower():
                         dsn_param.append(
                             '%(connection_key)s=%(value)s' % {'connection_key': key, 'value': url.query[query_key]})
-                        del url.query[query_key]
+                        url = url.difference_update_query([query_key])
                         break
 
             dsn = ';'.join(dsn_param)
