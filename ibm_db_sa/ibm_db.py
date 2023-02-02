@@ -37,10 +37,15 @@ else:
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
     def result_processor(self, dialect, coltype):
+        def to_float(value):
+            if Value is None:
+                return None
+            else:
+                return float(value)
         if self.asdecimal:
             return None
         else:
-            return processors.to_float
+            return to_float
 
 
 class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
