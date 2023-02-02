@@ -38,7 +38,7 @@ else:
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
     def result_processor(self, dialect, coltype):
         def to_float(value):
-            if Value is None:
+            if value is None:
                 return None
             else:
                 return float(value)
