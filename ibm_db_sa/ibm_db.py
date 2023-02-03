@@ -18,7 +18,8 @@
 # +--------------------------------------------------------------------------+
 
 from .base import DB2ExecutionContext, DB2Dialect
-from sqlalchemy import processors, types as sa_types, util
+from sqlalchemy import types as sa_types, util
+from sqlalchemy.engine import processors
 from sqlalchemy import __version__ as SA_Version
 from sqlalchemy.exc import ArgumentError
 
