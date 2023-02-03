@@ -110,7 +110,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
     )
 
     @classmethod
-    def dbapi(cls):
+    def import_dbapi(cls):
         """ Returns: the underlying DBAPI driver module
         """
         import ibm_db_dbi as module
@@ -215,8 +215,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
 
     # Checks if the DB_API driver error indicates an invalid connection
     def is_disconnect(self, ex, connection, cursor):
-        if isinstance(ex, (self.dbapi.ProgrammingError,
-                           self.dbapi.OperationalError)):
+        if isinstance(ex, (self.import_dbapi.ProgrammingError,
+                           self.import_dbapi.OperationalError)):
             connection_errors = ('Connection is not active', 'connection is no longer active',
                                  'Connection Resource cannot be found', 'SQL30081N',
                                  'CLI0108E', 'CLI0106E', 'SQL1224N')
