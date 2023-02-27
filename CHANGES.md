@@ -1,9 +1,9 @@
 CHANGES
 =======
 2023/02/27
-- Avoid URL object mutation
-- Fix offset condition
-- None check for server type
+- Fix offset condition (#117) (eonu)
+- Avoid URL object mutation (#116) (eonu)
+- None check for server type (#110) (amukherjee28)
 - Other bug fixes
 
 2022/05/17
