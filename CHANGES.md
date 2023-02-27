@@ -1,5 +1,11 @@
 CHANGES
 =======
+2023/02/27
+- Avoid URL object mutation
+- Fix offset condition
+- None check for server type
+- Other bug fixes
+
 2022/05/17
 - autoload bug fix with SQLAlchemy 1.4.x
 - remove warning message while connection
