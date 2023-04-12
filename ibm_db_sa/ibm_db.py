@@ -17,12 +17,19 @@
 # | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                       |
 # +--------------------------------------------------------------------------+
 
-from .base import DB2ExecutionContext, DB2Dialect
-from sqlalchemy import processors, types as sa_types, util
 from sqlalchemy import __version__ as SA_Version
+SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
+
+from .base import DB2ExecutionContext, DB2Dialect
+
+if SA_Version < [2,0]:
+    from sqlalchemy import processors, types as sa_types, util
+else:
+    from sqlalchemy import types as sa_types, util
+    from sqlalchemy.engine import processors
+
 from sqlalchemy.exc import ArgumentError
 
-SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 SQL_TXN_READ_UNCOMMITTED = 1
 SQL_TXN_READ_COMMITTED = 2
 SQL_TXN_REPEATABLE_READ = 4
@@ -37,10 +44,15 @@ else:
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
     def result_processor(self, dialect, coltype):
+        def to_float(value):
+            if value is None:
+                return None
+            else:
+                return float(value)
         if self.asdecimal:
             return None
         else:
-            return processors.to_float
+            return to_float
 
 
 class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
@@ -103,12 +115,21 @@ class DB2Dialect_ibm_db(DB2Dialect):
         }
     )
 
-    @classmethod
-    def dbapi(cls):
-        """ Returns: the underlying DBAPI driver module
-        """
-        import ibm_db_dbi as module
-        return module
+    if SA_Version < [2, 0]:
+        @classmethod
+        def dbapi(cls):
+            """ Returns: the underlying DBAPI driver module
+            """
+            import ibm_db_dbi as module
+            return module
+    else:
+        @classmethod
+        def import_dbapi(cls):
+            """ Returns: the underlying DBAPI driver module
+            """
+            import ibm_db_dbi as module
+            return module
+
 
     def do_execute(self, cursor, statement, parameters, context=None):
         if context and context._out_parameters:
@@ -219,6 +240,8 @@ class DB2Dialect_ibm_db(DB2Dialect):
                     return True
         else:
             return False
+
+
 
 
 dialect = DB2Dialect_ibm_db

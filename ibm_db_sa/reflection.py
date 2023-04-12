@@ -181,7 +181,7 @@ class DB2Reflector(BaseReflector):
                                    self.sys_tables.c.tabname == table_name)
         else:
             whereclause = self.sys_tables.c.tabname == table_name
-        s = sql.select([self.sys_tables.c.tabname], whereclause)
+        s = sql.select(self.sys_tables.c.tabname).where(whereclause)
         c = connection.execute(s)
         return c.first() is not None
 
@@ -193,7 +193,7 @@ class DB2Reflector(BaseReflector):
                                    self.sys_sequences.c.seqname == sequence_name)
         else:
             whereclause = self.sys_sequences.c.seqname == sequence_name
-        s = sql.select([self.sys_sequences.c.seqname], whereclause)
+        s = sql.select(self.sys_sequences.c.seqname).where(whereclause)
         c = connection.execute(s)
         return c.first() is not None
 
@@ -579,7 +579,7 @@ class AS400Reflector(BaseReflector):
                             self.sys_tables.c.tabname == table_name)
         else:
                 whereclause = self.sys_tables.c.tabname == table_name
-        s = sql.select([self.sys_tables], whereclause)
+        s = sql.select(self.sys_tables).where(whereclause)
         c = connection.execute(s)
         return c.first() is not None
 
@@ -593,7 +593,7 @@ class AS400Reflector(BaseReflector):
                             self.sys_sequences.c.seqname == sequence_name)
         else:
                 whereclause = self.sys_sequences.c.seqname == sequence_name
-        s = sql.select([self.sys_sequences.c.seqname], whereclause)
+        s = sql.select(self.sys_sequences.c.seqname).where(whereclause)
         c = connection.execute(s)
         return c.first() is not None
 
@@ -909,7 +909,7 @@ class OS390Reflector(BaseReflector):
                                    self.sys_tables.c.tabname == table_name)
         else:
             whereclause = self.sys_tables.c.tabname == table_name
-        s = sql.select([self.sys_tables.c.tabname], whereclause)
+        s = sql.select(self.sys_tables.c.tabname).where(whereclause)
         c = connection.execute(s)
         return c.first() is not None
 
@@ -921,7 +921,7 @@ class OS390Reflector(BaseReflector):
                                    self.sys_sequences.c.seqname == sequence_name)
         else:
             whereclause = self.sys_sequences.c.seqname == sequence_name
-        s = sql.select([self.sys_sequences.c.seqname], whereclause)
+        s = sql.select(self.sys_sequences.c.seqname).where(whereclause)
         c = connection.execute(s)
         return c.first() is not None
 
