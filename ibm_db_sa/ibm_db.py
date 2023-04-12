@@ -130,7 +130,6 @@ class DB2Dialect_ibm_db(DB2Dialect):
             import ibm_db_dbi as module
             return module
 
-
     def do_execute(self, cursor, statement, parameters, context=None):
         if context and context._out_parameters:
             statement = statement.split('(', 1)[0].split()[1]
@@ -240,8 +239,6 @@ class DB2Dialect_ibm_db(DB2Dialect):
                     return True
         else:
             return False
-
-
 
 
 dialect = DB2Dialect_ibm_db
