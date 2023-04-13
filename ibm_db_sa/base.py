@@ -671,8 +671,10 @@ class DB2Dialect(default.DefaultDialect):
     supports_unicode_binds = False
     if SA_Version < [1, 4]:
         returns_unicode_strings = False
-    else:
+    elif SA_Version < [2, 0]:
         returns_unicode_strings = sa_types.String.RETURNS_CONDITIONAL
+    else:
+        returns_unicode_strings = True
     postfetch_lastrowid = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = True
