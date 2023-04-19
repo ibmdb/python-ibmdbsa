@@ -86,6 +86,24 @@ Supported Databases
 - IBM Db2 on ZOS
 - IBM Db2 on Iseries
 
+Note
+-------------------------------------------------------------
+By default, all tables and schemas stored in a Db2 database are created
+using capital letters only.
+However, if you have a table name in lowercase letters, you can still reference
+it by enclosing the name in single quotes inside double quotes.
+For example
+```
+	if users table is in small letter inside database
+	So, you can use single quotes "'users'".
+	If you will not use single quotes such as "users", it will
+	be refered as "USERS".
+
+	metadata = sqlalchemy.MetaData(schema="schema1")
+	table = sqlalchemy.Table("'users'", metadata, autoload_with=engine)
+
+```
+
 Known Limitations in ibm_db_sa adapter for DB2 databases
 -------------------------------------------------------------
 1) Non-standard SQL queries are not supported. e.g. "SELECT ? FROM TAB1"

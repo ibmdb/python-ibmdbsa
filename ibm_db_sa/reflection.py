@@ -21,6 +21,7 @@ from sqlalchemy import types as sa_types
 from sqlalchemy import sql, util, join
 from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
+from sqlalchemy import *
 import re
 import codecs
 from sys import version_info
@@ -175,7 +176,11 @@ class DB2Reflector(BaseReflector):
     def has_table(self, connection, table_name, schema=None, **kw):
         current_schema = self.denormalize_name(
                             schema or self.default_schema_name)
-        table_name = self.denormalize_name(table_name)
+        if table_name.startswith("'") and table_name.endswith("'"):
+            table_name = table_name.replace("'", "")
+            table_name = self.normalize_name(table_name)
+        else:
+            table_name = self.denormalize_name(table_name)
         if current_schema:
             whereclause = sql.and_(self.sys_tables.c.tabschema == current_schema,
                                    self.sys_tables.c.tabname == table_name)
@@ -201,28 +206,27 @@ class DB2Reflector(BaseReflector):
     def get_sequence_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         sys_sequence = self.sys_sequences
-        query = sql.select([sys_sequence.c.seqname],
-                           sys_sequence.c.seqschema == current_schema,
-                           order_by=[sys_sequence.c.seqschema, sys_sequence.c.seqname])
+        query = sql.select(sys_sequence.c.seqname).\
+            where(sys_sequence.c.seqschema == current_schema).\
+            order_by(sys_sequence.c.seqschema, sys_sequence.c.seqname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_schemas
-        query = sql.select([sysschema.c.schemaname],
-            sql.not_(sysschema.c.schemaname.like('SYS%')),
-            order_by=[sysschema.c.schemaname]
-        )
+        query = sql.select(sysschema.c.schemaname).\
+            where(not_(sysschema.c.schemaname.like('SYS%'))).\
+            order_by(sysschema.c.schemaname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
     def get_table_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
-        query = sql.select([systbl.c.tabname]).\
-                    where(systbl.c.type == 'T').\
-                    where(systbl.c.tabschema == current_schema).\
-                    order_by(systbl.c.tabname)
+        query = sql.select(systbl.c.tabname).\
+            where(systbl.c.type == 'T').\
+            where(systbl.c.tabschema == current_schema).\
+            order_by(systbl.c.tabname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -230,9 +234,9 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         systbl = self.sys_tables
-        query = sql.select([systbl.c.remarks]). \
-            where(systbl.c.type == 'T'). \
-            where(systbl.c.tabschema == current_schema). \
+        query = sql.select(systbl.c.remarks).\
+            where(systbl.c.type == 'T').\
+            where(systbl.c.tabschema == current_schema).\
             where(systbl.c.tabname == table_name)
         c = connection.execute(query)
         return {'text': c.first()}
@@ -241,7 +245,7 @@ class DB2Reflector(BaseReflector):
     def get_view_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
 
-        query = sql.select([self.sys_views.c.viewname]).\
+        query = sql.select(self.sys_views.c.viewname).\
             where(self.sys_views.c.viewschema == current_schema).\
             order_by(self.sys_views.c.viewname)
 
@@ -252,7 +256,7 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         viewname = self.denormalize_name(viewname)
 
-        query = sql.select([self.sys_views.c.text]).\
+        query = sql.select(self.sys_views.c.text).\
             where(self.sys_views.c.viewschema == current_schema).\
             where(self.sys_views.c.viewname == viewname)
 
@@ -264,17 +268,15 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
 
-        query = sql.select([syscols.c.colname, syscols.c.typename,
+        query = sql.select(syscols.c.colname, syscols.c.typename,
                             syscols.c.defaultval, syscols.c.nullable,
                             syscols.c.length, syscols.c.scale,
-                            syscols.c.identity, syscols.c.generated, 
-                            syscols.c.remarks],
-              sql.and_(
+                            syscols.c.identity, syscols.c.generated,
+                            syscols.c.remarks).\
+            where(and_(
                   syscols.c.tabschema == current_schema,
-                  syscols.c.tabname == table_name
-                ),
-              order_by=[syscols.c.colno]
-            )
+                  syscols.c.tabname == table_name)).\
+            order_by(syscols.c.colno)
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
@@ -307,12 +309,11 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_indexes
         col_finder = re.compile("(\w+)")
-        query = sql.select([sysindexes.c.colnames, sysindexes.c.indname],
-                           sql.and_(
-                               sysindexes.c.tabschema == current_schema,
-                               sysindexes.c.tabname == table_name,
-                               sysindexes.c.uniquerule == 'P'),
-                           order_by=[sysindexes.c.tabschema, sysindexes.c.tabname])
+        query = sql.select(sysindexes.c.colnames, sysindexes.c.indname).\
+            where(and_(sysindexes.c.tabschema == current_schema,
+                       sysindexes.c.tabname == table_name,
+                       sysindexes.c.uniquerule == 'P')).\
+            order_by(sysindexes.c.tabschema, sysindexes.c.tabname)
         pk_columns = []
         pk_name = None
         for r in connection.execute(query):
@@ -330,14 +331,13 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
         col_finder = re.compile("(\w+)")
-        query = sql.select([syscols.c.colname],
-              sql.and_(
+        query = sql.select(syscols.c.colname).\
+            where(and_(
                   syscols.c.tabschema == current_schema,
                   syscols.c.tabname == table_name,
                   syscols.c.keyseq > 0
-                ),
-              order_by=[syscols.c.tabschema, syscols.c.tabname]
-            )
+                )).\
+            order_by(syscols.c.tabschema, syscols.c.tabname)
         pk_columns = []
         for r in connection.execute(query):
             cols = col_finder.findall(r[0])
@@ -352,17 +352,16 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
         systbl = self.sys_tables
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
-                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname]) \
-            .select_from(
+        query = sql.select(sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                            sysfkeys.c.pkname, sysfkeys.c.pktabschema,
+                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname).\
+            select_from(
                 join(systbl,sysfkeys, systbl.c.tabname == sysfkeys.c.pktabname)
-            ) \
-            .where(systbl.c.type == 'T') \
-            .where(systbl.c.tabschema == current_schema) \
-            .where(sysfkeys.c.fktabname == table_name) \
-            .order_by(systbl.c.tabname)
+            ).where(systbl.c.type == 'T').\
+            where(systbl.c.tabschema == current_schema).\
+            where(sysfkeys.c.fktabname == table_name).\
+            order_by(systbl.c.tabname)
 
         fschema = {}
         for r in connection.execute(query):
@@ -393,16 +392,15 @@ class DB2Reflector(BaseReflector):
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
-                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
-            sql.and_(
+        query = sql.select(sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                            sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                            sysfkeys.c.pkname, sysfkeys.c.pktabschema,
+                            sysfkeys.c.pktabname, sysfkeys.c.pkcolname).\
+            where(and_(
               sysfkeys.c.pktabschema == current_schema,
               sysfkeys.c.pktabname == table_name
-            ),
-            order_by=[sysfkeys.c.colno]
-          )
+            )).\
+            order_by(sysfkeys.c.colno)
 
         fschema = {}
         for r in connection.execute(query):
@@ -433,10 +431,10 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
-        query = sql.select([sysidx.c.indname, sysidx.c.colnames,
-                            sysidx.c.uniquerule, sysidx.c.system_required],
-                           sql.and_(sysidx.c.tabschema == current_schema,sysidx.c.tabname == table_name),
-                           order_by=[sysidx.c.tabname])
+        query = sql.select(sysidx.c.indname, sysidx.c.colnames,
+                            sysidx.c.uniquerule, sysidx.c.system_required).\
+            where(and_(sysidx.c.tabschema == current_schema,sysidx.c.tabname == table_name)).\
+            order_by(sysidx.c.tabname)
         indexes = []
         col_finder = re.compile("(\w+)")
         for r in connection.execute(query):
@@ -459,15 +457,13 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syskeycol = self.sys_keycoluse
         sysconst = self.sys_tabconst
-        query = sql.select([syskeycol.c.constname, syskeycol.c.colname],
-            sql.and_(
+        query = sql.select(syskeycol.c.constname, syskeycol.c.colname).\
+            where(and_(
               syskeycol.c.constname == sysconst.c.constname,
               sysconst.c.tabname == table_name,
               sysconst.c.tabschema == current_schema,
-              sysconst.c.type == 'U'
-            ),
-            order_by=[syskeycol.c.constname]
-          )
+              sysconst.c.type == 'U')).\
+            order_by(syskeycol.c.constname)
         uniqueConsts = []
         currConst = None
         for r in connection.execute(query):
@@ -604,18 +600,18 @@ class AS400Reflector(BaseReflector):
     def get_sequence_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         sys_sequence = self.sys_sequences
-        query = sql.select([sys_sequence.c.seqname],
-                           sys_sequence.c.seqschema == current_schema,
-                           order_by=[sys_sequence.c.seqschema, sys_sequence.c.seqname])
+        query = sql.select(sys_sequence.c.seqname).\
+            where(sys_sequence.c.seqschema == current_schema).\
+            order_by(sys_sequence.c.seqschema, sys_sequence.c.seqname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_schemas
-        query = sql.select([sysschema.c.schemaname]).\
-                where(~sysschema.c.schemaname.like(unicode('Q%'))).\
-                where(~sysschema.c.schemaname.like(unicode('SYS%'))).\
-                order_by(sysschema.c.schemaname)
+        query = sql.select(sysschema.c.schemaname).\
+            where(~sysschema.c.schemaname.like(unicode('Q%'))).\
+            where(~sysschema.c.schemaname.like(unicode('SYS%'))).\
+            order_by(sysschema.c.schemaname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     # Retrieves a list of table names for a given schema
@@ -623,10 +619,10 @@ class AS400Reflector(BaseReflector):
     def get_table_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
-        query = sql.select([systbl.c.tabname]).\
-                where(systbl.c.tabtype == unicode('T')).\
-                where(systbl.c.tabschema == current_schema).\
-                order_by(systbl.c.tabname)
+        query = not sql.select(systbl.c.tabname).\
+            where(systbl.c.tabtype == unicode('T')).\
+            where(systbl.c.tabschema == current_schema).\
+            order_by(systbl.c.tabname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -634,10 +630,9 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(
                                 schema or self.default_schema_name)
 
-        query = sql.select([self.sys_views.c.viewname],
-                self.sys_views.c.viewschema == current_schema,
-                order_by=[self.sys_views.c.viewname]
-            )
+        query = sql.select(self.sys_views.c.viewname).\
+            where(self.sys_views.c.viewschema == current_schema).\
+            order_by(self.sys_views.c.viewname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -646,10 +641,9 @@ class AS400Reflector(BaseReflector):
                                 schema or self.default_schema_name)
         viewname = self.denormalize_name(viewname)
 
-        query = sql.select([self.sys_views.c.text],
-                self.sys_views.c.viewschema == current_schema,
-                self.sys_views.c.viewname == viewname
-            )
+        query = sql.select(self.sys_views.c.text).\
+            where(self.sys_views.c.viewschema == current_schema).\
+            where(self.sys_views.c.viewname == viewname)
         return connection.execute(query).scalar()
 
     @reflection.cache
@@ -658,18 +652,15 @@ class AS400Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
 
-        query = sql.select([syscols.c.colname,
-                                syscols.c.typename,
-                                syscols.c.defaultval, syscols.c.nullable,
-                                syscols.c.length, syscols.c.scale,
-                                syscols.c.isid, syscols.c.idgenerate, 
-                                syscols.c.remark],
-                    sql.and_(
-                            syscols.c.tabschema == current_schema,
-                            syscols.c.tabname == table_name
-                        ),
-                    order_by=[syscols.c.colno]
-                )
+        query = sql.select(syscols.c.colname,syscols.c.typename,
+                           syscols.c.defaultval, syscols.c.nullable,
+                           syscols.c.length, syscols.c.scale,
+                           syscols.c.isid, syscols.c.idgenerate,
+                           syscols.c.remark).\
+            where(and_(
+                syscols.c.tabschema == current_schema,
+                syscols.c.tabname == table_name)).\
+            order_by(syscols.c.colno)
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
@@ -704,14 +695,14 @@ class AS400Reflector(BaseReflector):
         sysconst = self.sys_table_constraints
         syskeyconst = self.sys_key_constraints
 
-        query = sql.select([syskeyconst.c.colname, sysconst.c.tabname, sysconst.c.conname],
-                           sql.and_(
-                               syskeyconst.c.conschema == sysconst.c.conschema,
-                               syskeyconst.c.conname == sysconst.c.conname,
-                               sysconst.c.tabschema == current_schema,
-                               sysconst.c.tabname == table_name,
-                               sysconst.c.contype == 'PRIMARY KEY'
-                           ), order_by=[syskeyconst.c.colno])
+        query = sql.select(syskeyconst.c.colname, sysconst.c.tabname, sysconst.c.conname).\
+            where(and_(
+                syskeyconst.c.conschema == sysconst.c.conschema,
+                syskeyconst.c.conname == sysconst.c.conname,
+                sysconst.c.tabschema == current_schema,
+                sysconst.c.tabname == table_name,
+                sysconst.c.contype == 'PRIMARY KEY')).\
+            order_by(syskeyconst.c.colno)
 
         pk_columns = []
         pk_name = None
@@ -729,14 +720,14 @@ class AS400Reflector(BaseReflector):
         sysconst = self.sys_table_constraints
         syskeyconst = self.sys_key_constraints
 
-        query = sql.select([syskeyconst.c.colname, sysconst.c.tabname],
-                sql.and_(
-                    syskeyconst.c.conschema == sysconst.c.conschema,
-                    syskeyconst.c.conname == sysconst.c.conname,
-                    sysconst.c.tabschema == current_schema,
-                    sysconst.c.tabname == table_name,
-                    sysconst.c.contype == unicode('PRIMARY KEY')
-            ), order_by=[syskeyconst.c.colno])
+        query = sql.select(syskeyconst.c.colname, sysconst.c.tabname).\
+            where(and_(
+                syskeyconst.c.conschema == sysconst.c.conschema,
+                syskeyconst.c.conname == sysconst.c.conname,
+                sysconst.c.tabschema == current_schema,
+                sysconst.c.tabname == table_name,
+                sysconst.c.contype == unicode('PRIMARY KEY'))).\
+            order_by(syskeyconst.c.colno)
 
         return [self.normalize_name(key[0])
                     for key in connection.execute(query)]
@@ -748,16 +739,14 @@ class AS400Reflector(BaseReflector):
         default_schema = self.normalize_name(default_schema)
         table_name = self.denormalize_name(table_name)
         sysfkeys = self.sys_foreignkeys
-        query = sql.select([sysfkeys.c.fkname, sysfkeys.c.fktabschema, \
-                                sysfkeys.c.fktabname, sysfkeys.c.fkcolname, \
-                                sysfkeys.c.pkname, sysfkeys.c.pktabschema, \
-                                sysfkeys.c.pktabname, sysfkeys.c.pkcolname],
-                sql.and_(
-                    sysfkeys.c.fktabschema == current_schema,
-                    sysfkeys.c.fktabname == table_name
-                ),
-                order_by=[sysfkeys.c.colno]
-            )
+        query = sql.select(sysfkeys.c.fkname, sysfkeys.c.fktabschema,
+                           sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
+                           sysfkeys.c.pkname, sysfkeys.c.pktabschema,
+                           sysfkeys.c.pktabname, sysfkeys.c.pkcolname).\
+            where(and_(
+                sysfkeys.c.fktabschema == current_schema,
+                sysfkeys.c.fktabname == table_name)).\
+            order_by(sysfkeys.c.colno)
         fschema = {}
         for r in connection.execute(query):
             if r[0] not in fschema:
@@ -789,14 +778,14 @@ class AS400Reflector(BaseReflector):
         sysidx = self.sys_indexes
         syskey = self.sys_keys
 
-        query = sql.select([sysidx.c.indname,
-                            sysidx.c.uniquerule, syskey.c.colname], sql.and_(
-                    syskey.c.indschema == sysidx.c.indschema,
-                    syskey.c.indname == sysidx.c.indname,
-                    sysidx.c.tabschema == current_schema,
-                    sysidx.c.tabname == table_name
-                ), order_by=[syskey.c.indname, syskey.c.colno]
-            )
+        query = sql.select(sysidx.c.indname,sysidx.c.uniquerule,
+                           syskey.c.colname).\
+            where(and_(
+                syskey.c.indschema == sysidx.c.indschema,
+                syskey.c.indname == sysidx.c.indname,
+                sysidx.c.tabschema == current_schema,
+                sysidx.c.tabname == table_name)).\
+            order_by(syskey.c.indname, syskey.c.colno)
         indexes = {}
         for r in connection.execute(query):
             key = r[0].upper()
@@ -929,17 +918,17 @@ class OS390Reflector(BaseReflector):
     def get_sequence_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         sys_sequence = self.sys_sequences
-        query = sql.select([sys_sequence.c.seqname],
-                           sys_sequence.c.seqschema == current_schema,
-                           order_by=[sys_sequence.c.seqschema, sys_sequence.c.seqname])
+        query = sql.select(sys_sequence.c.seqname).\
+            where(sys_sequence.c.seqschema == current_schema).\
+            order_by(sys_sequence.c.seqschema, sys_sequence.c.seqname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_tables
-        query = sql.select([sysschema.c.tabschema],
-                           sql.not_(sysschema.c.tabschema.like('SYS%')),
-                           distinct=[sysschema.c.tabschema])
+        query = sql.select(sysschema.c.tabschema).\
+            where(not_(sysschema.c.tabschema.like('SYS%'))).\
+            distinct(sysschema.c.tabschema)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     def get_table_comment(self, connection, table_name, schema=None, **kw):
@@ -949,17 +938,17 @@ class OS390Reflector(BaseReflector):
     def get_table_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
-        query = sql.select([systbl.c.tabname]).\
-                    where(systbl.c.type == 'T').\
-                    where(systbl.c.tabschema == current_schema).\
-                    order_by(systbl.c.tabname)
+        query = sql.select(systbl.c.tabname).\
+            where(systbl.c.type == 'T').\
+            where(systbl.c.tabschema == current_schema).\
+            order_by(systbl.c.tabname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
     def get_view_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
 
-        query = sql.select([self.sys_views.c.viewname]).\
+        query = sql.select(self.sys_views.c.viewname).\
             where(self.sys_views.c.viewschema == current_schema).\
             order_by(self.sys_views.c.viewname)
 
@@ -970,7 +959,7 @@ class OS390Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         viewname = self.denormalize_name(viewname)
 
-        query = sql.select([self.sys_views.c.text]).\
+        query = sql.select(self.sys_views.c.text).\
             where(self.sys_views.c.viewschema == current_schema).\
             where(self.sys_views.c.viewname == viewname)
 
@@ -982,16 +971,14 @@ class OS390Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
 
-        query = sql.select([syscols.c.colname, syscols.c.typename,
-                            syscols.c.defaultval, syscols.c.nullable,
-                            syscols.c.length, syscols.c.scale,
-                            syscols.c.generated, syscols.c.remark],
-              sql.and_(
-                  syscols.c.tabschema == current_schema,
-                  syscols.c.tabname == table_name
-                ),
-              order_by=[syscols.c.colno]
-            )
+        query = sql.select(syscols.c.colname, syscols.c.typename,
+                           syscols.c.defaultval, syscols.c.nullable,
+                           syscols.c.length, syscols.c.scale,
+                           syscols.c.generated, syscols.c.remark).\
+            where(and_(
+                syscols.c.tabschema == current_schema,
+                syscols.c.tabname == table_name)).\
+            order_by(syscols.c.colno)
         sa_columns = []
         for r in connection.execute(query):
             coltype = r[1].upper()
@@ -1024,12 +1011,12 @@ class OS390Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_columns
         col_finder = re.compile("(\w+)")
-        query = sql.select([sysindexes.c.colname],
-                           sql.and_(
-                               sysindexes.c.tabschema == current_schema,
-                               sysindexes.c.tabname == table_name,
-                               sysindexes.c.keyseq > 0),
-                           order_by=[sysindexes.c.tabschema, sysindexes.c.tabname])
+        query = sql.select(sysindexes.c.colname).\
+            where(and_(
+                sysindexes.c.tabschema == current_schema,
+                sysindexes.c.tabname == table_name,
+                sysindexes.c.keyseq > 0)).\
+            order_by(sysindexes.c.tabschema, sysindexes.c.tabname)
         pk_columns = []
         for r in connection.execute(query):
             cols = col_finder.findall(r[0])
@@ -1042,14 +1029,12 @@ class OS390Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_columns
         col_finder = re.compile("(\w+)")
-        query = sql.select([sysindexes.c.colname],
-              sql.and_(
-                  sysindexes.c.tabschema == current_schema,
-                  sysindexes.c.tabname == table_name,
-                  sysindexes.c.keyseq > 0
-                ),
-              order_by=[sysindexes.c.tabschema, sysindexes.c.tabname]
-            )
+        query = sql.select(sysindexes.c.colname).\
+            where(and_(
+                sysindexes.c.tabschema == current_schema,
+                sysindexes.c.tabname == table_name,
+                sysindexes.c.keyseq > 0)).\
+            order_by(sysindexes.c.tabschema, sysindexes.c.tabname)
         pk_columns = []
         for r in connection.execute(query):
             cols = col_finder.findall(r[0])
@@ -1066,20 +1051,17 @@ class OS390Reflector(BaseReflector):
         sysrels = self.sys_rels
         syscolspk = self.sys_columns
         sysindex = self.sys_indexes
-        query = sql.select([sysrels.c.fkname, sysrels.c.fktabschema, \
-                            sysrels.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysindex.c.indname, sysrels.c.pktabschema, \
-                            sysrels.c.pktabname, syscolspk.c.colname],
-            sql.and_(
-              sysrels.c.fktabschema == current_schema,
-              sysrels.c.fktabname == table_name,
-              sysrels.c.fktabname == sysfkeys.c.fktabname,
-              sysrels.c.pktabname == syscolspk.c.tabname,
-              syscolspk.c.tabname == sysindex.c.tabname,
-              syscolspk.c.keyseq > 0
-            ),
-            order_by=[sysfkeys.c.colno]
-          )
+        query = sql.select(sysrels.c.fkname, sysrels.c.fktabschema,
+                           sysrels.c.fktabname, sysfkeys.c.fkcolname,
+                           sysindex.c.indname, sysrels.c.pktabschema,
+                           sysrels.c.pktabname, syscolspk.c.colname).\
+            where(and_(
+                sysrels.c.fktabschema == current_schema,
+                sysrels.c.fktabname == table_name,
+                sysrels.c.fktabname == sysfkeys.c.fktabname,
+                sysrels.c.pktabname == syscolspk.c.tabname,
+                syscolspk.c.tabname == sysindex.c.tabname,syscolspk.c.keyseq > 0)).\
+            order_by(sysfkeys.c.colno)
 
         fschema = {}
         for r in connection.execute(query):
@@ -1113,20 +1095,18 @@ class OS390Reflector(BaseReflector):
         sysrels = self.sys_rels
         syscolspk = self.sys_columns
         sysindex = self.sys_indexes
-        query = sql.select([sysrels.c.fkname, sysrels.c.fktabschema, \
-                            sysrels.c.fktabname, sysfkeys.c.fkcolname, \
-                            sysindex.c.indname, sysrels.c.pktabschema, \
-                            sysrels.c.pktabname, syscolspk.c.colname],
-            sql.and_(
-              syscolspk.c.tabschema == current_schema,
-              syscolspk.c.tabname == table_name,
-              sysrels.c.fktabname == sysfkeys.c.fktabname,
-              sysrels.c.pktabname == syscolspk.c.tabname,
-              syscolspk.c.tabname == sysindex.c.tabname,
-              syscolspk.c.keyseq > 0
-            ),
-            order_by=[sysfkeys.c.colno]
-          )
+        query = sql.select(sysrels.c.fkname, sysrels.c.fktabschema,
+                           sysrels.c.fktabname, sysfkeys.c.fkcolname,
+                           sysindex.c.indname, sysrels.c.pktabschema,
+                           sysrels.c.pktabname, syscolspk.c.colname).\
+            where(and_(
+                syscolspk.c.tabschema == current_schema,
+                syscolspk.c.tabname == table_name,
+                sysrels.c.fktabname == sysfkeys.c.fktabname,
+                sysrels.c.pktabname == syscolspk.c.tabname,
+                syscolspk.c.tabname == sysindex.c.tabname,
+                syscolspk.c.keyseq > 0)).\
+            order_by(sysfkeys.c.colno)
 
         fschema = {}
         for r in connection.execute(query):
@@ -1158,15 +1138,13 @@ class OS390Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         sysidx = self.sys_indexes
         syscolpk = self.sys_columns
-        query = sql.select([sysidx.c.indname, syscolpk.c.colname, sysidx.c.uniquerule, sysidx.c.system_required],
-            sql.and_(
-              sysidx.c.tabschema == current_schema,
-              sysidx.c.tabname == table_name,
-              syscolpk.c.colname == sysidx.c.tabname,
-              syscolpk.c.keyseq > 0
-            ),
-            order_by=[sysidx.c.tabname]
-          )
+        query = sql.select(sysidx.c.indname, syscolpk.c.colname, sysidx.c.uniquerule, sysidx.c.system_required).\
+            where(and_(
+                sysidx.c.tabschema == current_schema,
+                sysidx.c.tabname == table_name,
+                syscolpk.c.colname == sysidx.c.tabname,
+                syscolpk.c.keyseq > 0)).\
+            order_by(sysidx.c.tabname)
         indexes = []
         col_finder = re.compile("(\w+)")
         for r in connection.execute(query):
@@ -1187,15 +1165,13 @@ class OS390Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syskeycol = self.sys_keycoluse
         sysconst = self.sys_tabconst
-        query = sql.select([syskeycol.c.constname, syskeycol.c.colname],
-            sql.and_(
-              syskeycol.c.constname == sysconst.c.constname,
-              sysconst.c.tabname == table_name,
-              sysconst.c.tabschema == current_schema,
-              sysconst.c.type == 'U'
-            ),
-            order_by=[syskeycol.c.constname]
-          )
+        query = sql.select(syskeycol.c.constname, syskeycol.c.colname).\
+            where(and_(
+                syskeycol.c.constname == sysconst.c.constname,
+                sysconst.c.tabname == table_name,
+                sysconst.c.tabschema == current_schema,
+                sysconst.c.type == 'U')).\
+            order_by(syskeycol.c.constname)
         uniqueConsts = []
         currConst = None
         for r in connection.execute(query):
