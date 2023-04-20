@@ -33,8 +33,8 @@
 
  * implemented iseries db2 dialect inside PASE environment (openmax)
 
-
-2022/05/17
+2022-05-17, Version 0.3.8
+=========================
 - autoload bug fix with SQLAlchemy 1.4.x
 - remove warning message while connection
 - add columns reflection with comments
