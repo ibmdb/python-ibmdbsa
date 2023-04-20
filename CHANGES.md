@@ -1,10 +1,38 @@
-CHANGES
-=======
-2023/02/27
-- Fix offset condition (#117) (eonu)
-- Avoid URL object mutation (#116) (eonu)
-- None check for server type (#110) (amukherjee28)
-- Other bug fixes
+2023-04-20, Version 0.4.0
+=========================
+
+ * Changes for support of SQLAlchemy 2.0.x (#127) (bchoudhary6415)
+
+ * Some changes to support for SQLAlchemy 2.0 and resolved denormalise name error (#126) (bchoudhary6415)
+
+ * Support for SQLAlchemy 2.0 (#124) (bchoudhary6415)
+
+
+2023-02-27, Version 0.3.9
+=========================
+
+ * Made some changes for release 039 (#121) (bchoudhary6415)
+
+ * Release 039 (#120) (bchoudhary6415)
+
+ * resolve merge conflicts (Bimal Jha)
+
+ * don't mutate URL object (#116) (Edwin Onuonga)
+
+ * Fix offset condition (#117) (Edwin Onuonga)
+
+ * indentation change for changes file (amukherjee)
+
+ * Added missing columns for the previous commit (Sasa Tomic)
+
+ * Fix for reflection get_primary_keys (Sasa Tomic)
+
+ * DB2 may not return the column names in SYSCOL.INDEXES (Sasa Tomic)
+
+ * pyodbc mods (openmax)
+
+ * implemented iseries db2 dialect inside PASE environment (openmax)
+
 
 2022/05/17
 - autoload bug fix with SQLAlchemy 1.4.x
