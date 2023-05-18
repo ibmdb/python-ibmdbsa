@@ -357,7 +357,13 @@ class DB2Reflector(BaseReflector):
                             sysfkeys.c.pkname, sysfkeys.c.pktabschema,
                             sysfkeys.c.pktabname, sysfkeys.c.pkcolname).\
             select_from(
-                join(systbl,sysfkeys, systbl.c.tabname == sysfkeys.c.pktabname)
+                join(systbl,
+                     sysfkeys,
+                     sql.and_(
+                         systbl.c.tabname == sysfkeys.c.pktabname,
+                         systbl.c.tabschema == sysfkeys.c.pktabschema
+                     )
+                 )
             ).where(systbl.c.type == 'T').\
             where(systbl.c.tabschema == current_schema).\
             where(sysfkeys.c.fktabname == table_name).\
