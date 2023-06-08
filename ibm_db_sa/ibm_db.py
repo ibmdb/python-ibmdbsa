@@ -136,7 +136,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
             context._callproc_result = cursor.callproc(statement, parameters)
         else:
             check_server = getattr(DB2Dialect, 'serverType')
-            if 'round(' in statement and check_server == "DB2":
+            if ("round(" in statement.casefold()) and check_server == "DB2":
                 value_index = 0
                 while '?' in statement and value_index < len(parameters):
                     statement = statement.replace('?', str(parameters[value_index]), 1)
