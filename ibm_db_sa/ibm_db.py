@@ -135,7 +135,15 @@ class DB2Dialect_ibm_db(DB2Dialect):
             statement = statement.split('(', 1)[0].split()[1]
             context._callproc_result = cursor.callproc(statement, parameters)
         else:
-            cursor.execute(statement, parameters)
+            check_server = getattr(DB2Dialect, 'serverType')
+            if ("round(" in statement.casefold()) and check_server == "DB2":
+                value_index = 0
+                while '?' in statement and value_index < len(parameters):
+                    statement = statement.replace('?', str(parameters[value_index]), 1)
+                    value_index += 1
+                cursor.execute(statement)
+            else:
+                cursor.execute(statement, parameters)
 
     def _get_server_version_info(self, connection):
         return connection.connection.server_info()
