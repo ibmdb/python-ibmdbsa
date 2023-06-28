@@ -238,8 +238,7 @@ class DB2Reflector(BaseReflector):
             where(systbl.c.type == 'T').\
             where(systbl.c.tabschema == current_schema).\
             where(systbl.c.tabname == table_name)
-        c = connection.execute(query)
-        return {'text': c.first()}
+        return {'text': connection.execute(query).scalar()}
 
     @reflection.cache
     def get_view_names(self, connection, schema=None, **kw):
