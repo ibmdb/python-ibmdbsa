@@ -30,6 +30,7 @@ class DB2Dialect_pyodbc(PyODBCConnector, DB2Dialect):
     supports_unicode_statements = True
     supports_char_length = True
     supports_native_decimal = False
+    supports_statement_cache = False
 
     execution_ctx_cls = DB2ExecutionContext_pyodbc
 
