@@ -154,6 +154,10 @@ class _IBM_Date(sa_types.Date):
         return process
 
 
+class BOOLEAN(sa_types.Boolean):
+    __visit_name__ = 'BOOLEAN'
+
+
 class DOUBLE(sa_types.Numeric):
     __visit_name__ = 'DOUBLE'
 
@@ -190,6 +194,7 @@ colspecs = {
 }
 
 ischema_names = {
+    'BOOLEAN': BOOLEAN,
     'BLOB': BLOB,
     'CHAR': CHAR,
     'CHARACTER': CHAR,
