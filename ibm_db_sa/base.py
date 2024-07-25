@@ -733,6 +733,8 @@ class DB2Dialect(default.DefaultDialect):
             _reflector_cls = ibm_reflection.DB2Reflector
         elif "IDS/" in self.dbms_name:
             _reflector_cls = ibm_reflection.DB2Reflector
+        elif self.dbms_name.startswith("DSN"):
+            _reflector_cls = ibm_reflection.OS390Reflector            
         self._reflector = _reflector_cls(self)
 
     def get_columns(self, connection, table_name, schema=None, **kw):
