@@ -31,6 +31,9 @@ jobs:
 
       - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
+        permissions:
+          contents: read
+          id-token: write
         with:
           __token__: ${{ secrets.ACTIONS_ID_TOKEN_REQUEST_TOKEN }}
           repository_url: https://test.pypi.org/legacy/
