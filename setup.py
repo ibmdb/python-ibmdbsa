@@ -17,7 +17,7 @@ else:
     
 
 setup(
-         name='test_ibm_db_sa',
+         name='ibm_db_sa_arnab',
          version=VERSION,
          license='Apache License 2.0',
          description='SQLAlchemy support for IBM Data Servers',
