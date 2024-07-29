@@ -1,0 +1,36 @@
+name: Release to Test PyPI
+
+on:
+  push:
+    #tags:
+      #- 'v*.*.*'  # Trigger release on tags matching this pattern, e.g., v1.0.0
+
+jobs:
+  release:
+    name: Release to Test PyPI
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install setuptools wheel twine build
+
+      - name: Build the package
+        run: |
+          python -m build
+
+      - name: Publish to Test PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          username: ${{ secrets.TEST_PYPI_USERNAME }}
+          password: ${{ secrets.TEST_PYPI_PASSWD }}
+          repository_url: https://test.pypi.org/legacy/
