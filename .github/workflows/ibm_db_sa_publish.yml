@@ -1,11 +1,13 @@
 name: Build and upload to PyPI
 
+# Build on every workflow_dispatch, branch push, tag push, and pull request change
 on:
   workflow_dispatch:
   pull_request:
   push:
     branches:
-      - master, test_ibmdbsa
+      - master
+  # Sequence of patterns matched against refs/tags
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
