@@ -1,4 +1,4 @@
-2024-07-29, Version 0.0.1
+2024-07-30, Version 0.4.1
 =========================
 
  * Fix foreign key reflection when there are tables with the same name in different schemas (#128) (Xnot)
