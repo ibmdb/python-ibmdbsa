@@ -1,3 +1,21 @@
+2024-07-30, Version 0.4.1
+=========================
+
+ * Fix foreign key reflection when there are tables with the same name in different schemas (#128) (Xnot)
+
+ * Resolved issue of round function on zos server (#130) (bchoudhary6415)
+
+ * Resolved case-sensitive issue of round function (#131) (bchoudhary6415)
+
+ * Update pyodbc.py (#133) (Murchurl)
+
+ * Fix get_table_comment return value (#135) (andrasore-kodinfo)
+
+ * Fix boolean type not recognized warning (#140) (Xnot)
+
+ * Assign OS390Reflector for Db2 for z/OS (#147) (rhgit01)
+
+
 2023-04-20, Version 0.4.0
 =========================
 
