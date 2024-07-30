@@ -30,7 +30,7 @@ jobs:
 
       - name: Build the package
         run: |
-          python -m build
+          python setup.py sdist bdist_wheel
 
       - name: Publish to Test PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
