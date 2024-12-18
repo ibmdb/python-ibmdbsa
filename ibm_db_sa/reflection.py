@@ -462,24 +462,41 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syskeycol = self.sys_keycoluse
         sysconst = self.sys_tabconst
-        query = sql.select(syskeycol.c.constname, syskeycol.c.colname).\
-            where(and_(
-              syskeycol.c.constname == sysconst.c.constname,
-              sysconst.c.tabname == table_name,
-              sysconst.c.tabschema == current_schema,
-              sysconst.c.type == 'U')).\
-            order_by(syskeycol.c.constname)
+        query = (
+            sql.select(syskeycol.c.constname, syskeycol.c.colname)
+            .select_from(
+                join(
+                    syskeycol,
+                    sysconst,
+                    and_(
+                        syskeycol.c.constname == sysconst.c.constname,
+                        syskeycol.c.tabschema == sysconst.c.tabschema,
+                        syskeycol.c.tabname == sysconst.c.tabname,
+                    ),
+                )
+            )
+            .where(
+                and_(
+                    sysconst.c.tabname == table_name,
+                    sysconst.c.tabschema == current_schema,
+                    sysconst.c.type == "U",
+                )
+            )
+            .order_by(syskeycol.c.constname)
+        )
         uniqueConsts = []
         currConst = None
         for r in connection.execute(query):
             if currConst == r[0]:
-                uniqueConsts[-1]['column_names'].append(self.normalize_name(r[1]))
+                uniqueConsts[-1]["column_names"].append(self.normalize_name(r[1]))
             else:
                 currConst = r[0]
-                uniqueConsts.append({
-                        'name': self.normalize_name(currConst),
-                        'column_names': [self.normalize_name(r[1])],
-                    })
+                uniqueConsts.append(
+                    {
+                        "name": self.normalize_name(currConst),
+                        "column_names": [self.normalize_name(r[1])],
+                    }
+                )
         return uniqueConsts
 
 
@@ -779,7 +796,7 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(
                                     schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
-        
+
         sysidx = self.sys_indexes
         syskey = self.sys_keys
 
@@ -1170,22 +1187,39 @@ class OS390Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         syskeycol = self.sys_keycoluse
         sysconst = self.sys_tabconst
-        query = sql.select(syskeycol.c.constname, syskeycol.c.colname).\
-            where(and_(
-                syskeycol.c.constname == sysconst.c.constname,
-                sysconst.c.tabname == table_name,
-                sysconst.c.tabschema == current_schema,
-                sysconst.c.type == 'U')).\
-            order_by(syskeycol.c.constname)
+        query = (
+            sql.select(syskeycol.c.constname, syskeycol.c.colname)
+            .select_from(
+                join(
+                    syskeycol,
+                    sysconst,
+                    and_(
+                        syskeycol.c.constname == sysconst.c.constname,
+                        syskeycol.c.tabschema == sysconst.c.tabschema,
+                        syskeycol.c.tabname == sysconst.c.tabname,
+                    ),
+                )
+            )
+            .where(
+                and_(
+                    sysconst.c.tabname == table_name,
+                    sysconst.c.tabschema == current_schema,
+                    sysconst.c.type == "U",
+                )
+            )
+            .order_by(syskeycol.c.constname)
+        )
         uniqueConsts = []
         currConst = None
         for r in connection.execute(query):
             if currConst == r[0]:
-                uniqueConsts[-1]['column_names'].append(self.normalize_name(r[1]))
+                uniqueConsts[-1]["column_names"].append(self.normalize_name(r[1]))
             else:
                 currConst = r[0]
-                uniqueConsts.append({
-                        'name': self.normalize_name(currConst),
-                        'column_names': [self.normalize_name(r[1])],
-                    })
+                uniqueConsts.append(
+                    {
+                        "name": self.normalize_name(currConst),
+                        "column_names": [self.normalize_name(r[1])],
+                    }
+                )
         return uniqueConsts
