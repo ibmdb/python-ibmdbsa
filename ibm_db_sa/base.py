@@ -454,8 +454,9 @@ class DB2Compiler(compiler.SQLCompiler):
         # other types, I was able to CAST against VARCHAR
         # for example
         if isinstance(type_, (
-                sa_types.DateTime, sa_types.Date, sa_types.Time,
-                sa_types.DECIMAL, sa_types.String)):
+                sa_types.DateTime, sa_types.Date, sa_types.Time, sa_types.DOUBLE, sa_types.Double, sa_types.Integer, sa_types.INTEGER,
+                sa_types.Boolean, sa_types.BOOLEAN, sa_types.BIGINT, sa_types.BigInteger, sa_types.BINARY, sa_types.NUMERIC, sa_types.SmallInteger,
+                sa_types.DECIMAL, sa_types.String, sa_types.Float, sa_types.FLOAT, sa_types.Numeric)):
             return super(DB2Compiler, self).visit_cast(cast, **kw)
         else:
             return self.process(cast.clause)
