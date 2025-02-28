@@ -307,7 +307,7 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_indexes
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         query = sql.select(sysindexes.c.colnames, sysindexes.c.indname).\
             where(and_(sysindexes.c.tabschema == current_schema,
                        sysindexes.c.tabname == table_name,
@@ -329,7 +329,7 @@ class DB2Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         query = sql.select(syscols.c.colname).\
             where(and_(
                   syscols.c.tabschema == current_schema,
@@ -441,7 +441,7 @@ class DB2Reflector(BaseReflector):
             where(and_(sysidx.c.tabschema == current_schema,sysidx.c.tabname == table_name)).\
             order_by(sysidx.c.tabname)
         indexes = []
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         for r in connection.execute(query):
             if r[2] != 'P':
                 if r[2] == 'U' and r[3] != 0:
@@ -630,10 +630,16 @@ class AS400Reflector(BaseReflector):
     @reflection.cache
     def get_schema_names(self, connection, **kw):
         sysschema = self.sys_schemas
-        query = sql.select(sysschema.c.schemaname).\
-            where(~sysschema.c.schemaname.like(unicode('Q%'))).\
-            where(~sysschema.c.schemaname.like(unicode('SYS%'))).\
-            order_by(sysschema.c.schemaname)
+        if version_info[0] < 3:
+            query = sql.select(sysschema.c.schemaname). \
+                where(~sysschema.c.schemaname.like(unicode('Q%'))). \
+                where(~sysschema.c.schemaname.like(unicode('SYS%'))). \
+                order_by(sysschema.c.schemaname)
+        else:
+            query = sql.select(sysschema.c.schemaname). \
+                where(~sysschema.c.schemaname.like(str('Q%'))). \
+                where(~sysschema.c.schemaname.like(str('SYS%'))). \
+                order_by(sysschema.c.schemaname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     # Retrieves a list of table names for a given schema
@@ -641,10 +647,16 @@ class AS400Reflector(BaseReflector):
     def get_table_names(self, connection, schema=None, **kw):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
-        query = not sql.select(systbl.c.tabname).\
-            where(systbl.c.tabtype == unicode('T')).\
-            where(systbl.c.tabschema == current_schema).\
-            order_by(systbl.c.tabname)
+        if version_info[0] < 3:
+            query = not sql.select(systbl.c.tabname). \
+                where(systbl.c.tabtype == unicode('T')). \
+                where(systbl.c.tabschema == current_schema). \
+                order_by(systbl.c.tabname)
+        else:
+            query = not sql.select(systbl.c.tabname). \
+                where(systbl.c.tabtype == str('T')). \
+                where(systbl.c.tabschema == current_schema). \
+                order_by(systbl.c.tabname)
         return [self.normalize_name(r[0]) for r in connection.execute(query)]
 
     @reflection.cache
@@ -699,12 +711,22 @@ class AS400Reflector(BaseReflector):
                                     (coltype, r[0]))
                     coltype = coltype = sa_types.NULLTYPE
 
-            sa_columns.append({
+            if version_info[0] < 3:
+                sa_columns.append({
                     'name': self.normalize_name(r[0]),
                     'type': coltype,
                     'nullable': r[3] == unicode('Y'),
                     'default': r[2],
                     'autoincrement': (r[6] == unicode('YES')) and (r[7] != None),
+                    'comment': r[8] or None,
+                })
+            else:
+                sa_columns.append({
+                    'name': self.normalize_name(r[0]),
+                    'type': coltype,
+                    'nullable': r[3] == str('Y'),
+                    'default': r[2],
+                    'autoincrement': (r[6] == str('YES')) and (r[7] != None),
                     'comment': r[8] or None,
                 })
         return sa_columns
@@ -742,14 +764,24 @@ class AS400Reflector(BaseReflector):
         sysconst = self.sys_table_constraints
         syskeyconst = self.sys_key_constraints
 
-        query = sql.select(syskeyconst.c.colname, sysconst.c.tabname).\
-            where(and_(
+        if version_info[0] < 3:
+            query = sql.select(syskeyconst.c.colname, sysconst.c.tabname). \
+                where(and_(
                 syskeyconst.c.conschema == sysconst.c.conschema,
                 syskeyconst.c.conname == sysconst.c.conname,
                 sysconst.c.tabschema == current_schema,
                 sysconst.c.tabname == table_name,
-                sysconst.c.contype == unicode('PRIMARY KEY'))).\
-            order_by(syskeyconst.c.colno)
+                sysconst.c.contype == unicode('PRIMARY KEY'))). \
+                order_by(syskeyconst.c.colno)
+        else:
+            query = sql.select(syskeyconst.c.colname, sysconst.c.tabname). \
+                where(and_(
+                syskeyconst.c.conschema == sysconst.c.conschema,
+                syskeyconst.c.conname == sysconst.c.conname,
+                sysconst.c.tabschema == current_schema,
+                sysconst.c.tabname == table_name,
+                sysconst.c.contype == str('PRIMARY KEY'))). \
+                order_by(syskeyconst.c.colno)
 
         return [self.normalize_name(key[0])
                     for key in connection.execute(query)]
@@ -814,11 +846,18 @@ class AS400Reflector(BaseReflector):
             if key in indexes:
                 indexes[key]['column_names'].append(self.normalize_name(r[2]))
             else:
-                indexes[key] = {
-                                'name': self.normalize_name(r[0]),
-                                'column_names': [self.normalize_name(r[2])],
-                                'unique': r[1] == unicode('Y')
-                        }
+                if version_info[0] < 3:
+                    indexes[key] = {
+                        'name': self.normalize_name(r[0]),
+                        'column_names': [self.normalize_name(r[2])],
+                        'unique': r[1] == unicode('Y')
+                    }
+                else:
+                    indexes[key] = {
+                        'name': self.normalize_name(r[0]),
+                        'column_names': [self.normalize_name(r[2])],
+                        'unique': r[1] == str('Y')
+                    }
         return [value for key, value in indexes.items()]
 
     @reflection.cache
@@ -1032,7 +1071,7 @@ class OS390Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_columns
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         query = sql.select(sysindexes.c.colname).\
             where(and_(
                 sysindexes.c.tabschema == current_schema,
@@ -1050,7 +1089,7 @@ class OS390Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         sysindexes = self.sys_columns
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         query = sql.select(sysindexes.c.colname).\
             where(and_(
                 sysindexes.c.tabschema == current_schema,
@@ -1168,7 +1207,7 @@ class OS390Reflector(BaseReflector):
                 syscolpk.c.keyseq > 0)).\
             order_by(sysidx.c.tabname)
         indexes = []
-        col_finder = re.compile("(\w+)")
+        col_finder = re.compile(r"(\w+)")
         for r in connection.execute(query):
             if r[2] != 'P':
                 if r[2] == 'U' and r[3] != 0:
