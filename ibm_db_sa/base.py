@@ -371,7 +371,7 @@ class DB2Compiler(compiler.SQLCompiler):
         sql_ori = compiler.SQLCompiler.visit_select(self, select, **kwargs)
         if offset is not None:
             __rownum = 'Z.__ROWNUM'
-            sql_split = re.split("[\s+]FROM ", sql_ori, 1)
+            sql_split = re.split(r"[\s+]FROM ", sql_ori, 1)
             sql_sec = ""
             sql_sec = " \nFROM %s " % (sql_split[1])
 
