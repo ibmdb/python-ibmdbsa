@@ -1,3 +1,17 @@
+2025-06-23, Version 0.4.2
+=========================
+
+ * update yml file to upload package (#159) (bchoudhary6415)
+
+ * Resolve Unicode issue with latest python3.13 (ibmdb#155) (#157) (devMalteK)
+
+ * Resolve Unicode issue with latest python3.13 and added polaris.yml file (#155) (bchoudhary6415)
+
+ * Fix for issue Casting to sa.Float (and some other types) silently does (#154) (bchoudhary6415)
+
+ * Fix unique_constraints (#152) (IceS2)
+
+
 2024-07-30, Version 0.4.1
 =========================
 

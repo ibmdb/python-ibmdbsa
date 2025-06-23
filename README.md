@@ -5,7 +5,7 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.4.1 (2024/07/30)
+0.4.2 (2025/06/23)
 
 Prerequisites
 --------------
