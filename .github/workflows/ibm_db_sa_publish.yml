@@ -1,6 +1,5 @@
-name: Build and upload to PyPI
+name: Publish IBM_DB_SA Package
 
-# Build on every workflow_dispatch, branch push, tag push, and pull request change
 on:
   workflow_dispatch:
   pull_request:
@@ -11,29 +10,39 @@ on:
     tags:
       - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
 
-jobs:
-  deploy:
+permissions:
+  contents: read
+  id-token: write    # Required for trusted publishing to PyPI via OIDC
 
+jobs:
+  publish-pypi:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    environment: pypi  # Environment where PYPI_API_TOKEN secret is stored
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.x'
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install build
-    - name: Build package
-      run: |
-        python -m build
-    - name: Publish distribution to PyPI
-      if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-      uses: pypa/gh-action-pypi-publish@release/v1
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    permissions:
-      # IMPORTANT: this permission is mandatory for trusted publishing
-      id-token: write
-      contents: write # Added permission for GitHub Actions to push tags
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI with trusted publishing (OIDC)
+        uses: pypa/gh-action-pypi-publish@v1.5.0
+        with:
+          # Use GitHub OIDC token to authenticate instead of password
+          # The action supports OIDC automatically when password is empty
+          # so leave password empty and it will use OIDC.
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: dist

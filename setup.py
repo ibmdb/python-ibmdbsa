@@ -19,7 +19,8 @@ else:
 setup(
          name='ibm_db_sa',
          version=VERSION,
-         license='Apache License 2.0',
+         license = "Apache-2.0",
+         license_files = ("LICENSE",),
          description='SQLAlchemy support for IBM Data Servers',
          author='IBM Application Development Team',
          author_email='balram.choudhary@ibm.com',
@@ -30,7 +31,6 @@ setup(
          classifiers=[
             'Development Status :: 5 - Production/Stable',
             'Intended Audience :: Developers',
-            'License :: OSI Approved :: Apache Software License',
             'Operating System :: OS Independent',
             'Topic :: Database :: Front-Ends'
         ],
