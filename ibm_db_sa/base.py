@@ -239,6 +239,9 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
     def visit_SMALLINT(self, type_, **kw):
         return "SMALLINT"
 
+    def visit_BOOLEAN(self, type_, **kw):
+        return "BOOLEAN"
+
     def visit_INT(self, type_, **kw):
         return "INT"
 
@@ -311,7 +314,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
         return self.visit_INT(type_, **kw)
 
     def visit_boolean(self, type_, **kw):
-        return self.visit_SMALLINT(type_, **kw)
+        return self.visit_BOOLEAN(type_, **kw)
 
     def visit_float(self, type_, **kw):
         return self.visit_FLOAT(type_, **kw)
