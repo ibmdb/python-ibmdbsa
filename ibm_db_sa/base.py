@@ -19,6 +19,7 @@
 """Support for IBM DB2 database
 
 """
+import sqlalchemy
 import datetime, re
 from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
@@ -28,10 +29,42 @@ from sqlalchemy.sql import operators
 from sqlalchemy.engine import default
 from sqlalchemy import __version__ as SA_Version
 from . import reflection as ibm_reflection
+from packaging import version
 
-from sqlalchemy.types import BLOB, CHAR, CLOB, DATE, DATETIME, INTEGER, \
-    SMALLINT, BIGINT, DECIMAL, NUMERIC, REAL, TIME, TIMESTAMP, \
-    VARCHAR, FLOAT
+SQLALCHEMY_VERSION = version.parse(sqlalchemy.__version__)
+
+if SQLALCHEMY_VERSION >= version.parse("2.0"):
+    from sqlalchemy.sql.sqltypes import NullType, NULLTYPE, _Binary
+    from sqlalchemy.sql.sqltypes import (
+        ARRAY, BIGINT, BigInteger, BINARY, BLOB, BOOLEAN, Boolean,
+        CHAR, CLOB, Concatenable, DATE, Date, DATETIME, DateTime,
+        DECIMAL, DOUBLE, Double, DOUBLE_PRECISION, Enum, FLOAT, Float,
+        Indexable, INT, INTEGER, Integer, Interval, JSON, LargeBinary,
+        MatchType, NCHAR, NUMERIC, Numeric, NVARCHAR,
+        PickleType, REAL, SchemaType, SMALLINT, SmallInteger, String,
+        STRINGTYPE, TEXT, Text, TIME, Time, TIMESTAMP, TupleType,
+        Unicode, UnicodeText, UUID, Uuid, VARBINARY, VARCHAR
+    )
+    from sqlalchemy.sql.type_api import (
+        adapt_type, ExternalType, to_instance, TypeDecorator, TypeEngine,
+        UserDefinedType, Variant
+    )
+else:
+    from sqlalchemy.sql.sqltypes import NullType, NULLTYPE, _Binary
+    from sqlalchemy.sql.sqltypes import (
+        ARRAY, BIGINT, BigInteger, BINARY, BLOB, BOOLEAN, Boolean,
+        CHAR, CLOB, Concatenable, DATE, Date, DATETIME, DateTime,
+        DECIMAL, Enum, FLOAT, Float, Indexable, INT, INTEGER, Integer,
+        Interval, JSON, LargeBinary, MatchType, NCHAR,
+        NUMERIC, Numeric, NVARCHAR, PickleType, REAL,
+        SchemaType, SMALLINT, SmallInteger, String, STRINGTYPE, TEXT,
+        Text, TIME, Time, TIMESTAMP, TupleType, Unicode, UnicodeText,
+        VARBINARY, VARCHAR
+    )
+    from sqlalchemy.sql.type_api import (
+        adapt_type, ExternalType, to_instance, TypeDecorator, TypeEngine,
+        UserDefinedType, Variant
+    )
 
 SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
@@ -453,13 +486,32 @@ class DB2Compiler(compiler.SQLCompiler):
     def visit_cast(self, cast, **kw):
         type_ = cast.typeclause.type
 
-        # TODO: verify that CAST shouldn't be called with
-        # other types, I was able to CAST against VARCHAR
-        # for example
-        if isinstance(type_, (
-                sa_types.DateTime, sa_types.Date, sa_types.Time, sa_types.DOUBLE, sa_types.Double, sa_types.Integer, sa_types.INTEGER,
-                sa_types.Boolean, sa_types.BOOLEAN, sa_types.BIGINT, sa_types.BigInteger, sa_types.BINARY, sa_types.NUMERIC, sa_types.SmallInteger,
-                sa_types.DECIMAL, sa_types.String, sa_types.Float, sa_types.FLOAT, sa_types.Numeric)):
+        if SQLALCHEMY_VERSION >= version.parse("2.0"):
+            valid_types = (
+                CHAR, VARCHAR, CLOB, String, Text, Unicode, UnicodeText,
+                BLOB, LargeBinary, VARBINARY,
+                SMALLINT, SmallInteger,
+                INTEGER, Integer,
+                BIGINT, BigInteger,
+                DECIMAL, NUMERIC, Float, REAL, DOUBLE, Double, Numeric,
+                DATE, Date, TIME, Time, TIMESTAMP, DateTime,
+                BOOLEAN, Boolean,
+                NullType
+            )
+        else:
+            valid_types = (
+                CHAR, VARCHAR, CLOB, String, Text, Unicode, UnicodeText,
+                BLOB, LargeBinary, VARBINARY,
+                SMALLINT, SmallInteger,
+                INTEGER, Integer,
+                BIGINT, BigInteger,
+                DECIMAL, NUMERIC, Float, REAL, Numeric,
+                DATE, Date, TIME, Time, TIMESTAMP, DateTime,
+                BOOLEAN, Boolean,
+                NullType
+            )
+
+        if isinstance(type_, valid_types):
             return super(DB2Compiler, self).visit_cast(cast, **kw)
         else:
             return self.process(cast.clause)
