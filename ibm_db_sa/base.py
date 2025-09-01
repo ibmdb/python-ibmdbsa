@@ -397,18 +397,32 @@ class DB2Compiler(compiler.SQLCompiler):
                                 self.process(binary.right))
 
     def limit_clause(self, select, **kwargs):
-        if (select._limit is not None) and (select._offset is None):
-            return " FETCH FIRST %s ROWS ONLY" % select._limit
-        else:
-            return ""
+        limit = select._limit
+        offset = select._offset or 0
+
+        if limit is not None:
+            if offset > 0:
+                return f" LIMIT {limit} OFFSET {offset}"
+            else:
+                return f" LIMIT {limit}"
+        return ""
 
     def visit_select(self, select, **kwargs):
         limit, offset = select._limit, select._offset
         sql_ori = compiler.SQLCompiler.visit_select(self, select, **kwargs)
+
+        if ('LIMIT' in sql_ori.upper()) or ('FETCH FIRST' in sql_ori.upper()):
+            return sql_ori
+
+        if limit is not None:
+            sql = re.sub(r'FETCH FIRST \d+ ROWS ONLY', '', sql_ori, flags=re.IGNORECASE).strip()
+            limit_offset_clause = self.limit_clause(select, **kwargs)
+            sql += limit_offset_clause
+            return sql
+
         if offset is not None:
             __rownum = 'Z.__ROWNUM'
             sql_split = re.split(r"[\s+]FROM ", sql_ori, 1)
-            sql_sec = ""
             sql_sec = " \nFROM %s " % (sql_split[1])
 
             dummyVal = "Z.__db2_"
@@ -420,45 +434,39 @@ class DB2Compiler(compiler.SQLCompiler):
 
             sql_select_token = sql_split[0].split(",")
             i = 0
-            while (i < len(sql_select_token)):
+            while i < len(sql_select_token):
                 if sql_select_token[i].count("TIMESTAMP(DATE(SUBSTR(CHAR(") == 1:
-                    sql_sel = "%s \"%s%d\"," % (sql_sel, dummyVal, i + 1)
-                    sql_pri = '%s %s,%s,%s,%s AS "%s%d",' % (
-                        sql_pri,
-                        sql_select_token[i],
-                        sql_select_token[i + 1],
-                        sql_select_token[i + 2],
-                        sql_select_token[i + 3],
-                        dummyVal, i + 1)
-                    i = i + 4
+                    sql_sel = f'{sql_sel} "{dummyVal}{i + 1}",'
+                    sql_pri = f'{sql_pri} {sql_select_token[i]},{sql_select_token[i + 1]},{sql_select_token[i + 2]},{sql_select_token[i + 3]} AS "{dummyVal}{i + 1}",'
+                    i += 4
                     continue
 
                 if sql_select_token[i].count(" AS ") == 1:
                     temp_col_alias = sql_select_token[i].split(" AS ")
-                    sql_pri = '%s %s,' % (sql_pri, sql_select_token[i])
-                    sql_sel = "%s %s," % (sql_sel, temp_col_alias[1])
-                    i = i + 1
+                    sql_pri = f'{sql_pri} {sql_select_token[i]},'
+                    sql_sel = f'{sql_sel} {temp_col_alias[1]},'
+                    i += 1
                     continue
 
-                sql_pri = '%s %s AS "%s%d",' % (sql_pri, sql_select_token[i], dummyVal, i + 1)
-                sql_sel = "%s \"%s%d\"," % (sql_sel, dummyVal, i + 1)
-                i = i + 1
+                sql_pri = f'{sql_pri} {sql_select_token[i]} AS "{dummyVal}{i + 1}",'
+                sql_sel = f'{sql_sel} "{dummyVal}{i + 1}",'
+                i += 1
 
-            sql_pri = sql_pri[:len(sql_pri) - 1]
-            sql_pri = "%s%s" % (sql_pri, sql_sec)
-            sql_sel = sql_sel[:len(sql_sel) - 1]
-            sql = '%s, ( ROW_NUMBER() OVER() ) AS "%s" FROM ( %s ) AS M' % (sql_sel, __rownum, sql_pri)
-            sql = '%s FROM ( %s ) Z WHERE' % (sql_sel, sql)
+            sql_pri = sql_pri.rstrip(",")
+            sql_pri = f"{sql_pri}{sql_sec}"
+            sql_sel = sql_sel.rstrip(",")
+            sql = f'{sql_sel}, ( ROW_NUMBER() OVER() ) AS "{__rownum}" FROM ( {sql_pri} ) AS M'
+            sql = f'{sql_sel} FROM ( {sql} ) Z WHERE'
 
             if offset != 0:
-                sql = '%s "%s" > %d' % (sql, __rownum, offset)
+                sql = f'{sql} "{__rownum}" > {offset}'
             if offset != 0 and limit is not None:
-                sql = '%s AND ' % (sql)
+                sql = f'{sql} AND '
             if limit is not None:
-                sql = '%s "%s" <= %d' % (sql, __rownum, offset + limit)
-            return "( %s )" % (sql,)
-        else:
-            return sql_ori
+                sql = f'{sql} "{__rownum}" <= {offset + limit}'
+            return f"( {sql} )"
+
+        return sql_ori
 
     def visit_sequence(self, sequence, **kw):
         if sequence.schema:
