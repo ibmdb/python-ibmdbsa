@@ -217,7 +217,7 @@ class DB2Reflector(BaseReflector):
         query = sql.select(sysschema.c.schemaname).\
             where(not_(sysschema.c.schemaname.like('SYS%'))).\
             order_by(sysschema.c.schemaname)
-        return [self.normalize_name(r[0]) for r in connection.execute(query)]
+        return [self.normalize_name(r[0].rstrip()) for r in connection.execute(query)]
 
     @reflection.cache
     def get_table_names(self, connection, schema=None, **kw):
@@ -640,7 +640,7 @@ class AS400Reflector(BaseReflector):
                 where(~sysschema.c.schemaname.like(str('Q%'))). \
                 where(~sysschema.c.schemaname.like(str('SYS%'))). \
                 order_by(sysschema.c.schemaname)
-        return [self.normalize_name(r[0]) for r in connection.execute(query)]
+        return [self.normalize_name(r[0].rstrip()) for r in connection.execute(query)]
 
     # Retrieves a list of table names for a given schema
     @reflection.cache
@@ -990,7 +990,7 @@ class OS390Reflector(BaseReflector):
         query = sql.select(sysschema.c.tabschema).\
             where(not_(sysschema.c.tabschema.like('SYS%'))).\
             distinct(sysschema.c.tabschema)
-        return [self.normalize_name(r[0]) for r in connection.execute(query)]
+        return [self.normalize_name(r[0].rstrip()) for r in connection.execute(query)]
 
     def get_table_comment(self, connection, table_name, schema=None, **kw):
         raise NotImplementedError()
