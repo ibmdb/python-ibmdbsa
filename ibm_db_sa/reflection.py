@@ -235,7 +235,6 @@ class DB2Reflector(BaseReflector):
         table_name = self.denormalize_name(table_name)
         systbl = self.sys_tables
         query = sql.select(systbl.c.remarks).\
-            where(systbl.c.type == 'T').\
             where(systbl.c.tabschema == current_schema).\
             where(systbl.c.tabname == table_name)
         return {'text': connection.execute(query).scalar()}
