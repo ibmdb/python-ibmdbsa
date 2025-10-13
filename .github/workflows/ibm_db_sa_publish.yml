@@ -1,48 +1,59 @@
-name: Publish IBM_DB_SA Package
+name: Build and Publish IBM_DB_SA Package
 
 on:
-  workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - master
-  # Sequence of patterns matched against refs/tags
-    tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+ workflow_dispatch:
+ pull_request:
+ push:
+   branches:
+     - master
+   tags:
+     - 'v*'
 
 permissions:
-  contents: read
-  id-token: write    # Required for trusted publishing to PyPI via OIDC
+ contents: read
+ id-token: write
 
 jobs:
-  publish-pypi:
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-    runs-on: ubuntu-latest
-    environment: pypi  # Environment where PYPI_API_TOKEN secret is stored
+ build:
+   runs-on: ubuntu-latest
+   steps:
+     - name: Checkout code
+       uses: actions/checkout@v4
+     - name: Set up Python
+       uses: actions/setup-python@v5
+       with:
+         python-version: '3.x'
+     - name: Install build dependencies
+       run: |
+         python -m pip install --upgrade pip
+         pip install build
+     - name: Build package
+       run: python -m build
 
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install build
-
-      - name: Build package
-        run: python -m build
-
-      - name: Publish to PyPI with trusted publishing (OIDC)
-        uses: pypa/gh-action-pypi-publish@v1.13.0
-        with:
-          # Use GitHub OIDC token to authenticate instead of password
-          # The action supports OIDC automatically when password is empty
-          # so leave password empty and it will use OIDC.
-          user: __token__
-          password: ${{ secrets.PYPI_API_TOKEN }}
-          packages_dir: dist
+ publish-pypi:
+   needs: build
+   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+   runs-on: ubuntu-latest
+   environment: pypi
+   steps:
+     - name: Checkout code
+       uses: actions/checkout@v4
+     - name: Set up Python
+       uses: actions/setup-python@v5
+       with:
+         python-version: '3.x'
+     - name: Install build dependencies
+       run: |
+         python -m pip install --upgrade pip
+         pip install build
+     - name: Build package
+       run: python -m build
+     - name: Publish to PyPI with trusted publishing (OIDC)
+       uses: pypa/gh-action-pypi-publish@v1.13.0
+       with:
+         # Use GitHub OIDC token to authenticate instead of password
+         # The action supports OIDC automatically when password is empty
+         # so leave password empty and it will use OIDC.
+         user: __token__
+         password: ${{ secrets.PYPI_API_TOKEN }}
+         packages_dir: dist
