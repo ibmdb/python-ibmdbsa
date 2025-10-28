@@ -654,12 +654,12 @@ class AS400Reflector(BaseReflector):
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         systbl = self.sys_tables
         if version_info[0] < 3:
-            query = not sql.select(systbl.c.tabname). \
+            query = sql.select(systbl.c.tabname). \
                 where(systbl.c.tabtype == unicode('T')). \
                 where(systbl.c.tabschema == current_schema). \
                 order_by(systbl.c.tabname)
         else:
-            query = not sql.select(systbl.c.tabname). \
+            query = sql.select(systbl.c.tabname). \
                 where(systbl.c.tabtype == str('T')). \
                 where(systbl.c.tabschema == current_schema). \
                 order_by(systbl.c.tabname)
