@@ -58,5 +58,7 @@ setup(
                     ]
        },
        zip_safe=False,
-       tests_require=['nose >= 0.11'],
+       extras_require={
+           "dev": ["nose>=0.11"]
+       }
      )
