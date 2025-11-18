@@ -1,3 +1,31 @@
+2025-11-18, Version 0.4.3
+=========================
+
+ * chore: add pyproject.toml and replace tests_require with extras_require (#185) (bchoudhary6415)
+
+ * fix 'boolean value not defined' error on AS400 (#181) (Michael Maltese)
+
+ * use correct AS400 reflector when dbms_name/_ver is none (#183) (Michael Maltese)
+
+ * updated yml file to build project with every commit (#178) (bchoudhary6415)
+
+ * fix get_schema_names to remove trailing spaces (#177) (Michael Maltese)
+
+ * feat: make get_table_comment work on OS390 and AS400 (#176) (Michael Maltese)
+
+ * fix get_table_comment to work for views (#175) (Michael Maltese)
+
+ * Bump pypa/gh-action-pypi-publish in /.github/workflows (#169) (dependabot[bot])
+
+ * Add support for standard LIMIT and OFFSET syntax (#167) (bchoudhary6415)
+
+ * Fix: Add sqlalchemy.types.DOUBLE to dependency version specification (#166) (bchoudhary6415)
+
+ * Resolved Boolean renders as smallint (#163) (bchoudhary6415)
+
+ * Support for FULL OUTER JOIN (#162) (bchoudhary6415)
+
+
 2025-06-23, Version 0.4.2
 =========================
 
