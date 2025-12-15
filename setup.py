@@ -11,9 +11,9 @@ v.close()
 
 readme = os.path.join(os.path.dirname(__file__), 'README.md')
 if 'USE_PYODBC' in os.environ and os.environ['USE_PYODBC'] == '1':
-    require = ['sqlalchemy>=0.7.3']
+    require = ['sqlalchemy>=0.7.3', 'packaging>=20.0']
 else:
-    require = ['sqlalchemy>=0.7.3','ibm_db>=2.0.0']
+    require = ['sqlalchemy>=0.7.3','ibm_db>=2.0.0', 'packaging>=20.0']
     
 
 setup(

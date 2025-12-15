@@ -29,6 +29,7 @@ from sys import version_info
 
 class CoerceUnicode(sa_types.TypeDecorator):
     impl = sa_types.Unicode
+    cache_ok = True
 
     def process_bind_param(self, value, dialect):
         if isinstance(value, str):
