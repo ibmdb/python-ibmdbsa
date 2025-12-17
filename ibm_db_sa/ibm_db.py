@@ -17,12 +17,14 @@
 # | Contributors: Jaimy Azle, Mike Bayer,Hemlata Bhatt                       |
 # +--------------------------------------------------------------------------+
 
-from sqlalchemy import __version__ as SA_Version
-SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
+import re
+from sqlalchemy import __version__ as SA_VERSION_STR
+m = re.match(r"^\s*(\d+)\.(\d+)", SA_VERSION_STR)
+SA_VERSION_MM = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 
 from .base import DB2ExecutionContext, DB2Dialect
 
-if SA_Version < [2,0]:
+if SA_VERSION_MM < (2, 0):
     from sqlalchemy import processors, types as sa_types, util
 else:
     from sqlalchemy import types as sa_types, util
@@ -36,7 +38,7 @@ SQL_TXN_REPEATABLE_READ = 4
 SQL_TXN_SERIALIZABLE = 8
 SQL_ATTR_TXN_ISOLATION = 108
 
-if SA_Version < [0, 8]:
+if SA_VERSION_MM < (0, 8):
     from sqlalchemy.engine import base
 else:
     from sqlalchemy.engine import result as _result
@@ -76,7 +78,7 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 
     def get_result_proxy(self):
         if self._callproc_result and self._out_parameters:
-            if SA_Version < [0, 8]:
+            if SA_VERSION_MM < (0, 8):
                 result = base.ResultProxy(self)
             else:
                 result = _result.ResultProxy(self)
@@ -89,7 +91,7 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 
             return result
         else:
-            if SA_Version < [0, 8]:
+            if SA_VERSION_MM < (0, 8):
                 result = base.ResultProxy(self)
             else:
                 result = _result.ResultProxy(self)
@@ -115,7 +117,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
         }
     )
 
-    if SA_Version < [2, 0]:
+    if SA_VERSION_MM < (2, 0):
         @classmethod
         def dbapi(cls):
             """ Returns: the underlying DBAPI driver module
