@@ -29,13 +29,13 @@ from sqlalchemy.sql.elements import BindParameter
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql import operators
 from sqlalchemy.engine import default
-from sqlalchemy import __version__ as SA_Version
+from sqlalchemy import __version__ as SA_VERSION_STR
 from . import reflection as ibm_reflection
-from packaging import version
 
-SQLALCHEMY_VERSION = version.parse(sqlalchemy.__version__)
+m = re.match(r"^\s*(\d+)\.(\d+)", SA_VERSION_STR)
+SA_VERSION_MM = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 
-if SQLALCHEMY_VERSION >= version.parse("2.0"):
+if SA_VERSION_MM >= (2, 0):
     from sqlalchemy.sql.sqltypes import NullType, NULLTYPE, _Binary
     from sqlalchemy.sql.sqltypes import (
         ARRAY, BIGINT, BigInteger, BINARY, BLOB, BOOLEAN, Boolean,
@@ -67,8 +67,6 @@ else:
         adapt_type, ExternalType, to_instance, TypeDecorator, TypeEngine,
         UserDefinedType, Variant
     )
-
-SA_Version = [int(ver_token) for ver_token in SA_Version.split('.')[0:2]]
 
 # as documented from:
 # http://publib.boulder.ibm.com/infocenter/db2luw/v9/index.jsp?topic=/com.ibm.db2.udb.doc/admin/r0001095.htm
@@ -373,7 +371,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
 
 
 class DB2Compiler(compiler.SQLCompiler):
-    if SA_Version < [0, 9]:
+    if SA_VERSION_MM < (0, 9):
         def visit_false(self, expr, **kw):
             return '0'
 
@@ -550,7 +548,7 @@ class DB2Compiler(compiler.SQLCompiler):
     def visit_cast(self, cast, **kw):
         type_ = cast.typeclause.type
 
-        if SQLALCHEMY_VERSION >= version.parse("2.0"):
+        if SA_VERSION_MM >= (2, 0):
             valid_types = (
                 CHAR, VARCHAR, CLOB, String, Text, Unicode, UnicodeText,
                 BLOB, LargeBinary, VARBINARY,
@@ -718,7 +716,7 @@ class DB2DDLCompiler(compiler.DDLCompiler):
         return result
 
     def visit_create_index(self, create, include_schema=True, include_table_schema=True, **kw):
-        if SA_Version < [0, 8]:
+        if SA_VERSION_MM < (0, 8):
             sql = super(DB2DDLCompiler, self).visit_create_index(create, **kw)
         else:
             sql = super(DB2DDLCompiler, self).visit_create_index(create, include_schema, include_table_schema, **kw)
@@ -798,9 +796,9 @@ class DB2Dialect(default.DefaultDialect):
     supports_char_length = False
     supports_unicode_statements = False
     supports_unicode_binds = False
-    if SA_Version < [1, 4]:
+    if SA_VERSION_MM < (1, 4):
         returns_unicode_strings = False
-    elif SA_Version < [2, 0]:
+    elif SA_VERSION_MM < (2, 0):
         returns_unicode_strings = sa_types.String.RETURNS_CONDITIONAL
     else:
         returns_unicode_strings = True
