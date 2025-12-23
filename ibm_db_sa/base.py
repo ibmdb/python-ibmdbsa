@@ -35,38 +35,67 @@ from . import reflection as ibm_reflection
 m = re.match(r"^\s*(\d+)\.(\d+)", SA_VERSION_STR)
 SA_VERSION_MM = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 
+# SQLAlchemy >= 2.0
 if SA_VERSION_MM >= (2, 0):
-    from sqlalchemy.sql.sqltypes import NullType, NULLTYPE, _Binary
-    from sqlalchemy.sql.sqltypes import (
-        ARRAY, BIGINT, BigInteger, BINARY, BLOB, BOOLEAN, Boolean,
-        CHAR, CLOB, Concatenable, DATE, Date, DATETIME, DateTime,
-        DECIMAL, DOUBLE, Double, DOUBLE_PRECISION, Enum, FLOAT, Float,
-        Indexable, INT, INTEGER, Integer, Interval, JSON, LargeBinary,
-        MatchType, NCHAR, NUMERIC, Numeric, NVARCHAR,
-        PickleType, REAL, SchemaType, SMALLINT, SmallInteger, String,
-        STRINGTYPE, TEXT, Text, TIME, Time, TIMESTAMP, TupleType,
-        Unicode, UnicodeText, UUID, Uuid, VARBINARY, VARCHAR
-    )
-    from sqlalchemy.sql.type_api import (
-        adapt_type, ExternalType, to_instance, TypeDecorator, TypeEngine,
-        UserDefinedType, Variant
-    )
+   from sqlalchemy.sql.sqltypes import (
+       Integer, SmallInteger, BigInteger, String, Text, Unicode, UnicodeText,
+       Boolean, Date, Time, DateTime, Interval,
+       Float, Numeric, DECIMAL,
+       Enum, LargeBinary, JSON, PickleType, REAL,
+       CHAR, VARCHAR, NCHAR, NVARCHAR, BINARY, VARBINARY,
+       CLOB, BLOB, SchemaType, TupleType, UUID, Uuid,
+   )
+   from sqlalchemy.sql.type_api import (
+       TypeEngine, TypeDecorator, UserDefinedType, Variant, ExternalType,
+   )
+   from sqlalchemy.sql.sqltypes import NullType
+# SQLAlchemy >= 1.4 and < 2.0
+elif SA_VERSION_MM >= (1, 4):
+   from sqlalchemy.sql.sqltypes import (
+       Integer, SmallInteger, BigInteger, String, Text, Unicode, UnicodeText,
+       Boolean, Date, Time, DateTime, Interval,
+       Float, Numeric, DECIMAL,
+       Enum, LargeBinary, JSON, PickleType, REAL,
+       CHAR, VARCHAR, NCHAR, NVARCHAR,
+       BINARY, VARBINARY, CLOB, BLOB, SchemaType, TupleType,
+   )
+   from sqlalchemy.sql.type_api import (
+       TypeEngine, TypeDecorator, UserDefinedType, Variant, ExternalType,
+   )
+   from sqlalchemy.sql.sqltypes import NullType
+   UUID = None
+   Uuid = None
+# SQLAlchemy <= 1.3
 else:
-    from sqlalchemy.sql.sqltypes import NullType, NULLTYPE, _Binary
-    from sqlalchemy.sql.sqltypes import (
-        ARRAY, BIGINT, BigInteger, BINARY, BLOB, BOOLEAN, Boolean,
-        CHAR, CLOB, Concatenable, DATE, Date, DATETIME, DateTime,
-        DECIMAL, Enum, FLOAT, Float, Indexable, INT, INTEGER, Integer,
-        Interval, JSON, LargeBinary, MatchType, NCHAR,
-        NUMERIC, Numeric, NVARCHAR, PickleType, REAL,
-        SchemaType, SMALLINT, SmallInteger, String, STRINGTYPE, TEXT,
-        Text, TIME, Time, TIMESTAMP, TupleType, Unicode, UnicodeText,
-        VARBINARY, VARCHAR
-    )
-    from sqlalchemy.sql.type_api import (
-        adapt_type, ExternalType, to_instance, TypeDecorator, TypeEngine,
-        UserDefinedType, Variant
-    )
+   from sqlalchemy.sql.sqltypes import (
+       Integer, SmallInteger, BigInteger, String, Text, Unicode, UnicodeText,
+       Boolean, Date, Time, DateTime, Interval,
+       Float, Numeric, DECIMAL,
+       Enum, LargeBinary, JSON, PickleType, REAL,
+       CHAR, VARCHAR, NCHAR, NVARCHAR,
+       BINARY, VARBINARY, CLOB, BLOB, SchemaType,
+   )
+   from sqlalchemy.sql.type_api import (
+       TypeEngine, TypeDecorator, UserDefinedType, Variant,
+   )
+   from sqlalchemy.sql.sqltypes import NullType
+   # Not available in SQLAlchemy 1.3
+   TupleType = None
+   ExternalType = None
+   UUID = None
+   Uuid = None
+
+# Stable aliases for internal use (all SA versions)
+BOOLEAN = Boolean
+INTEGER = Integer
+SMALLINT = SmallInteger
+BIGINT = BigInteger
+NUMERIC = Numeric
+FLOAT = Float
+DATE = Date
+TIME = Time
+DATETIME = DateTime
+TIMESTAMP = DateTime
 
 # as documented from:
 # http://publib.boulder.ibm.com/infocenter/db2luw/v9/index.jsp?topic=/com.ibm.db2.udb.doc/admin/r0001095.htm
@@ -555,7 +584,7 @@ class DB2Compiler(compiler.SQLCompiler):
                 SMALLINT, SmallInteger,
                 INTEGER, Integer,
                 BIGINT, BigInteger,
-                DECIMAL, NUMERIC, Float, REAL, DOUBLE, Double, Numeric,
+                DECIMAL, NUMERIC, Float, REAL, DOUBLE, Numeric,
                 DATE, Date, TIME, Time, TIMESTAMP, DateTime,
                 BOOLEAN, Boolean,
                 NullType

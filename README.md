@@ -69,6 +69,8 @@ A TCP/IP connection can be specified as the following::
 	from sqlalchemy import create_engine
 
 	e = create_engine("db2+ibm_db://user:pass@host[:port]/database")
+	or
+	e = create_engine("ibm_db_sa://user:pass@host[:port]/database")
 ```
 
 For a local socket connection, exclude the "host" and "port" portions::
@@ -77,11 +79,13 @@ For a local socket connection, exclude the "host" and "port" portions::
 	from sqlalchemy import create_engine
 
 	e = create_engine("db2+ibm_db://user:pass@/database")
+	or
+	e = create_engine("ibm_db_sa://user:pass@/database")
 ```
 
 Supported Databases
 -------------------
-- IBM DB2 Universal Database for Linux/Unix/Windows versions 9.7 onwards 
+- IBM DB2 Database for Linux/Unix/Windows versions 11.5 onwards
 - IBM Db2 on Cloud
 - IBM Db2 on ZOS
 - IBM Db2 on Iseries
