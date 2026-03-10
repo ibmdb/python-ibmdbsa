@@ -32,7 +32,7 @@ def configure_ibmdbsa_logging(target=False):
        handler = ibmdbsa_logging.StreamHandler()
    # File logging
    elif isinstance(target, str):
-       handler = ibmdbsa_logging.FileHandler(target, mode="w")
+       handler = ibmdbsa_logging.FileHandler(target, mode="w", encoding='utf-8')
    else:
        logger.disabled = True
        logger._ibmdbsa_target = target
