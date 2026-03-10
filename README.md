@@ -83,6 +83,109 @@ For a local socket connection, exclude the "host" and "port" portions::
 	e = create_engine("ibm_db_sa://user:pass@/database")
 ```
 
+## Logging in ibm_db_sa
+The `ibm_db_sa` module provides built-in logging support to help debug SQLAlchemy dialect operations, connection handling, reflection, and SQL execution.
+Logging can be enabled using the `ibmdbsa_log` query parameter in the database connection URL.
+
+### Logging Configuration
+Use the `ibmdbsa_log` parameter at the end of the connection URL.
+Possible values:
+```
+True        -> Enable logging to the console
+"filename"  -> Enable logging to a file (file is overwritten on each run)
+False       -> Disable logging
+```
+
+---
+### Examples
+#### 1. Enable Logging to a File (Current Directory)
+Logs will be written to a file in the current working directory.
+```python
+from sqlalchemy import create_engine
+engine = create_engine(
+   "ibm_db_sa://userID:Password@host:port/database?ibmdbsa_log=log_ibmdbsa.txt"
+)
+```
+This will create the file:
+```
+log_ibmdbsa.txt
+```
+---
+#### 2. Enable Logging to a File (Specific Directory)
+You can provide an absolute file path.
+#### Windows example
+```python
+from sqlalchemy import create_engine
+engine = create_engine(
+   "ibm_db_sa://userID:Password@host:port/database?ibmdbsa_log=C:\\Users\\Logs\\log_ibmdbsa.txt"
+)
+```
+#### Linux / macOS example
+```python
+from sqlalchemy import create_engine
+engine = create_engine(
+   "ibm_db_sa://userID:Password@host:port/database?ibmdbsa_log=/var/log/log_ibmdbsa.txt"
+)
+```
+---
+#### 3. Enable Console Logging
+Logs will be printed to the terminal or console.
+```python
+from sqlalchemy import create_engine
+engine = create_engine(
+   "ibm_db_sa://userID:Password@host:port/database?ibmdbsa_log=True"
+)
+```
+---
+### Using SQLAlchemy URL Object
+Logging can also be configured using SQLAlchemy's `URL` object.
+#### Log to File
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
+url_object = URL.create(
+   drivername="ibm_db_sa",
+   username="userID",
+   password="Password",
+   host="host",
+   port=port,
+   database="database",
+   query={"ibmdbsa_log": "log_ibmdbsa.txt"},
+)
+engine = create_engine(url_object)
+```
+---
+#### Log to Console
+```python
+from sqlalchemy import create_engine
+from sqlalchemy.engine import URL
+url_object = URL.create(
+   drivername="ibm_db_sa",
+   username="userID",
+   password="Password",
+   host="host",
+   port=port,
+   database="database",
+   query={"ibmdbsa_log": "True"},
+)
+engine = create_engine(url_object)
+```
+---
+### Notes
+- Logging configuration is automatically detected when the SQLAlchemy engine is created.
+- The `ibmdbsa_log` parameter is removed internally before the connection parameters are passed to the DBAPI driver.
+- If logging is not specified, logging remains disabled by default.
+---
+#### Typical Use Cases
+Logging can help diagnose:
+- Connection issues
+- SQL execution problems
+- Reflection metadata queries
+- Dialect initialization
+- Performance troubleshooting
+
+
+
 Supported Databases
 -------------------
 - IBM DB2 Database for Linux/Unix/Windows versions 11.5 onwards
