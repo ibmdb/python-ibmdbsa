@@ -1,3 +1,15 @@
+2026-03-18, Version 0.4.4
+=========================
+
+ * Add Logging functionality in ibm_db_sa (#194) (bchoudhary6415)
+
+ * Fix TupleType import failure across SQLAlchemy versions (#192) (bchoudhary6415)
+
+ * refactor: remove runtime packaging dependency for SQLAlchemy version checks (#190) (bchoudhary6415)
+
+ * Make Db2 dialect statement-cache compatible (#188) (bchoudhary6415)
+
+
 2025-11-18, Version 0.4.3
 =========================
 
