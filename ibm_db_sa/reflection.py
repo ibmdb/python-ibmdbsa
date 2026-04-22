@@ -243,6 +243,8 @@ class DB2Reflector(BaseReflector):
     @log_entry_exit
     def has_table(self, connection, table_name, schema=None, **kw):
         try:
+            if not isinstance(table_name, str) or len(table_name) > 128:
+                return False
             logger.debug(f"Checking table existence -> schema={schema}, table={table_name}")
             current_schema = self.denormalize_name(schema or self.default_schema_name)
             original_table_name = table_name
@@ -903,6 +905,8 @@ class AS400Reflector(BaseReflector):
     @log_entry_exit
     def has_table(self, connection, table_name, schema=None, **kw):
         try:
+            if not isinstance(table_name, str) or len(table_name) > 128:
+                return False
             current_schema = self.denormalize_name(schema or self.default_schema_name)
             table_name = self.denormalize_name(table_name)
             logger.debug(
@@ -1503,6 +1507,8 @@ class OS390Reflector(BaseReflector):
     @log_entry_exit
     def has_table(self, connection, table_name, schema=None, **kw):
         try:
+            if not isinstance(table_name, str) or len(table_name) > 128:
+                return False
             current_schema = self.denormalize_name(schema or self.default_schema_name)
             table_name = self.denormalize_name(table_name)
             logger.debug(

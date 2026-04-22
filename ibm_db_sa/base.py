@@ -1475,6 +1475,13 @@ class DB2Dialect(default.DefaultDialect):
 
     @log_entry_exit
     def has_table(self, connection, table_name, schema=None, **kw):
+        if not isinstance(table_name, str) or len(table_name) > 128:
+            logger.debug(
+                f"has_table -> returning False (invalid table_name: "
+                f"type={type(table_name).__name__}, "
+                f"len={len(table_name) if isinstance(table_name, str) else 'N/A'})"
+            )
+            return False
         exists = self._reflector.has_table(connection, table_name, schema=schema, **kw)
         logger.debug(f"Table exists -> {exists}")
         return exists
