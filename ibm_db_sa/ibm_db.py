@@ -18,32 +18,33 @@
 # +--------------------------------------------------------------------------+
 
 import re
+import warnings
+from collections.abc import MutableMapping, Sequence
+from typing import Any, cast
+
 from sqlalchemy import __version__ as SA_VERSION_STR
-from .logger import init_ibmdbsa_logging, logger, log_entry_exit
+from sqlalchemy import types as sa_types
+from sqlalchemy import util
+from sqlalchemy.engine import result as _result
+from sqlalchemy.engine.url import URL
+from sqlalchemy.exc import ArgumentError
+
+from .base import DB2Dialect, DB2ExecutionContext
+from .logger import init_ibmdbsa_logging, log_entry_exit, logger
+
 m = re.match(r"^\s*(\d+)\.(\d+)", SA_VERSION_STR)
 SA_VERSION_MM = (int(m.group(1)), int(m.group(2))) if m else (0, 0)
 
-from .base import DB2ExecutionContext, DB2Dialect
-
 if SA_VERSION_MM < (2, 0):
-    from sqlalchemy import processors, types as sa_types, util
+    from sqlalchemy import processors
 else:
-    from sqlalchemy import types as sa_types, util
     from sqlalchemy.engine import processors
-
-from sqlalchemy.exc import ArgumentError
 
 SQL_TXN_READ_UNCOMMITTED = 1
 SQL_TXN_READ_COMMITTED = 2
 SQL_TXN_REPEATABLE_READ = 4
 SQL_TXN_SERIALIZABLE = 8
 SQL_ATTR_TXN_ISOLATION = 108
-
-if SA_VERSION_MM < (0, 8):
-    from sqlalchemy.engine import base
-else:
-    from sqlalchemy.engine import result as _result
-
 
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
    @log_entry_exit
@@ -234,65 +235,63 @@ class DB2Dialect_ibm_db(DB2Dialect):
         logger.debug("Resetting isolation level to default (CS)")
         self.set_isolation_level(connection, 'CS')
 
-    def create_connect_args(self, url):
-        url, ibmdbsa_log_value = init_ibmdbsa_logging(url)
-        # DSN support through CLI configuration (../cfg/db2cli.ini),
-        # while 2 connection attributes are mandatory: database alias
-        # and UID (in support to current schema), all the other
-        # connection attributes (protocol, hostname, servicename) are
-        # provided through db2cli.ini database catalog entry. Example
-        # 1: ibm_db_sa:///<database_alias>?UID=db2inst1 or Example 2:
-        # ibm_db_sa:///?DSN=<database_alias>;UID=db2inst1
+    def create_connect_args(
+        self, url: URL
+    ) -> tuple[Sequence[str], MutableMapping[str, Any]]:
+        url, _ = cast(tuple[URL, None], init_ibmdbsa_logging(url))
         logger.info("entry create_connect_args()")
+
+        if url.database is None:
+            raise ValueError(f"the engine URL `{url!r}` does not specify a database")
+
         if not url.host:
             logger.debug("Using DSN based connection")
-            dsn = url.database
-            uid = url.username
-            pwd = url.password
-            logger.debug("DSN connection parameters -> database=%s user=%s", dsn, uid)
+            username = url.username or ""
+            logger.debug(
+                "DSN connection parameters -> database=%s user=%s",
+                url.database,
+                username,
+            )
             logger.info("exit create_connect_args()")
-            return (dsn, uid, pwd, '', ''), {}
+            return (url.database, username, url.password or "", "", ""), {}
+
+        logger.debug("Using full connection URL for remote DB2 server")
+        params: dict[str, Any] = url.translate_connect_args(
+            database="DATABASE",
+            host="HOSTNAME",
+            password="PWD",
+            port="PORT",
+            username="UID",
+        )
+        for k, v in params.items():
+            if k == "PWD":
+                continue
+            logger.debug(f"{k}: %s", v)
+        params["PROTOCOL"] = "TCPIP"
+        for k, v in url.query.items():
+            logger.debug("Applying connection option: %s=%s", k, v)
+        # This doesn't handle the tuple of strings scenario, but neither does the original code.
+        params |= url.query
+
+        if url.password is None:
+            safe_params = params
         else:
-            # Full URL string support for connection to remote data servers
-            logger.debug("Using full connection URL for remote DB2 server")
-            dsn_param = ['DATABASE=%s' % url.database,
-                         'HOSTNAME=%s' % url.host,
-                         'PROTOCOL=TCPIP']
-            logger.debug("Host: %s", url.host)
-            logger.debug("Database: %s", url.database)
-            if url.port:
-                logger.debug("Port: %s", url.port)
-                dsn_param.append('PORT=%s' % url.port)
-            if url.username:
-                logger.debug("User: %s", url.username)
-                dsn_param.append('UID=%s' % url.username)
-            if url.password:
-                # if password contains ';' truncate at first ';' (existing logic)
-                if ';' in url.password:
-                    logger.debug("Password contains ';', truncating")
-                    url = url._replace(password=(url.password).partition(";")[0])
-                dsn_param.append('PWD=%s' % url.password)
-            # check for connection arguments
-            connection_keys = ['Security', 'SSLClientKeystoredb', 'SSLClientKeystash', 'SSLServerCertificate',
-                               'CurrentSchema']
-            # rebuild query_keys in case url changed
-            query_keys = list(url.query.keys()) if url.query else []
-            for key in connection_keys:
-                for query_key in query_keys:
-                    if query_key.lower() == key.lower():
-                        logger.debug("Applying connection option: %s=%s", key, url.query[query_key])
-                        dsn_param.append(
-                            '%(connection_key)s=%(value)s' % {'connection_key': key, 'value': url.query[query_key]})
-                        url = url.difference_update_query([query_key])
-                        break
-            dsn = ';'.join(dsn_param)
-            dsn += ';'
-            safe_dsn = dsn
-            if 'PWD=' in safe_dsn:
-                safe_dsn = re.sub(r'PWD=[^;]*', 'PWD=****', safe_dsn)
-            logger.debug("Constructed DB2 DSN: %s", safe_dsn)
-            logger.info("exit create_connect_args()")
-            return (dsn, url.username, '', '', ''), {}
+            safe_params = params | {"PWD": "****"}
+            truncated_password, semicolon, _ = cast(str, url.password).partition(";")
+            if semicolon:
+                logger.debug("Password contains ';', truncating")
+                warnings.warn(
+                    "The provided password contained ';' and has been truncated. "
+                    "This will become an exception in a future release.",
+                    DeprecationWarning,
+                )
+                params["PWD"] = truncated_password
+
+        safe_dsn = "".join(f"{k}={v};" for k, v in safe_params.items())
+        logger.debug("Constructed DB2 DSN: %s", safe_dsn)
+        dsn = "".join(f"{k}={v};" for k, v in params.items())
+        logger.info("exit create_connect_args()")
+        return (dsn, "", "", "", ""), {}
 
     # Retrieves current schema for the specified connection object
     @log_entry_exit
