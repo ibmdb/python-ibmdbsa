@@ -10,10 +10,11 @@ VERSION = re.compile(r".*__version__ = '(.*?)'", re.S).match(v.read()).group(1)
 v.close()
 
 readme = os.path.join(os.path.dirname(__file__), 'README.md')
+sqlalchemy_requirement = "sqlalchemy>=1.3.5"
 if 'USE_PYODBC' in os.environ and os.environ['USE_PYODBC'] == '1':
-    require = ['sqlalchemy>=0.7.3']
+    require = [sqlalchemy_requirement]
 else:
-    require = ['sqlalchemy>=0.7.3','ibm_db>=2.0.0']
+    require = [sqlalchemy_requirement,'ibm_db>=2.0.0']
     
 
 setup(
@@ -37,6 +38,7 @@ setup(
          long_description=open(readme).read(),
          platforms='All',
          install_requires= require,
+         python_requires=">=3.9",
          packages=['ibm_db_sa'],
         entry_points={
          'sqlalchemy.dialects': [
