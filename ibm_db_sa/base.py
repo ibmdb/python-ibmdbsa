@@ -171,7 +171,7 @@ RESERVED_WORDS = set(
      'unnest', 'element', 'percentile_disc', 'upper', 'exec', 'power', 'var_pop', 'exp',
      'real', 'var_samp', 'false', 'recursive', 'varchar', 'filter', 'ref', 'varying',
      'float', 'regr_avgx', 'width_bucket', 'floor', 'regr_avgy', 'window', 'fusion',
-     'regr_count', 'within', 'asc'])
+     'regr_count', 'within', 'asc', 'role'])
 
 
 class _IBM_Boolean(sa_types.Boolean):
@@ -499,14 +499,34 @@ class DB2Compiler(compiler.SQLCompiler):
 
     @log_entry_exit
     def for_update_clause(self, select, **kw):
-        for_update = select.for_update
-        logger.debug(f"Processing FOR UPDATE clause -> value={for_update}")
-        if for_update is True:
-            clause = " WITH RS USE AND KEEP UPDATE LOCKS"
-        elif for_update == "read":
-            clause = " WITH RS USE AND KEEP SHARE LOCKS"
+        # Version-agnostic FOR UPDATE handling (SQLAlchemy 0.7.3 -> 2.0.x).
+        #
+        # SQLAlchemy >= 1.0 stores the lock request on ``select._for_update_arg``
+        # (a ForUpdateArg object, or None when no locking was requested) and the
+        # legacy ``select.for_update`` attribute was removed.
+        #
+        # SQLAlchemy < 1.0 exposes the legacy ``select.for_update`` attribute
+        # whose value is False / True / "read" / "nowait" / "read_nowait" / etc.
+        if hasattr(select, "_for_update_arg"):
+            # Modern API (SQLAlchemy 1.0+ including 2.0.x)
+            for_update_arg = select._for_update_arg
+            logger.debug(f"Processing FOR UPDATE clause (modern) -> value={for_update_arg}")
+            if for_update_arg is None:
+                clause = ""
+            elif getattr(for_update_arg, "read", False):
+                clause = " WITH RS USE AND KEEP SHARE LOCKS"
+            else:
+                clause = " WITH RS USE AND KEEP UPDATE LOCKS"
         else:
-            clause = ""
+            # Legacy API (SQLAlchemy < 1.0)
+            for_update = getattr(select, "for_update", None)
+            logger.debug(f"Processing FOR UPDATE clause (legacy) -> value={for_update}")
+            if for_update in ("read", "read_nowait"):
+                clause = " WITH RS USE AND KEEP SHARE LOCKS"
+            elif for_update:
+                clause = " WITH RS USE AND KEEP UPDATE LOCKS"
+            else:
+                clause = ""
         logger.debug(f"Generated FOR UPDATE clause -> {clause}")
         return clause
 
@@ -1196,6 +1216,23 @@ class DB2IdentifierPreparer(compiler.IdentifierPreparer):
            f"reserved_words_count={len(self.reserved_words)}, "
            f"illegal_initial_characters={self.illegal_initial_characters}"
        )
+
+   def quote_identifier(self, value):
+       """Override to uppercase normalized identifiers before quoting.
+       Db2 folds unquoted identifiers to uppercase, so when we need to quote
+       a name that was stored as lowercase (SQLAlchemy's normalized form),
+       we must uppercase it to match the catalog (e.g., "ROLE" not "role").
+
+       Only case-insensitive names are uppercased.  If the name is a SQLAlchemy
+       ``quoted_name`` that was explicitly marked to preserve quoting
+       (``quote=True``) — i.e. a deliberately case-sensitive identifier — it is
+       left exactly as-is so lowercase-quoted objects still resolve correctly.
+       Mixed-case names are likewise preserved.
+       """
+       force_quote = getattr(value, "quote", None)
+       if force_quote is not True and value == value.lower():
+           value = value.upper()
+       return self.initial_quote + value + self.final_quote
 
 
 class _SelectLastRowIDMixin(object):
