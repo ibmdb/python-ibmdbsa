@@ -219,7 +219,7 @@ Known Limitations in ibm_db_sa adapter for DB2 databases
 4) UPDATE CASCADE for foreign keys not supported
 5) DEFERRABLE INITIALLY deferred not supported
 6) Subquery in ON clause of LEFT OUTER JOIN not supported
-7) PyODBC and Jython/zxjdbc support is experimental
+7) PyODBC support is experimental
 
 
 Credits
