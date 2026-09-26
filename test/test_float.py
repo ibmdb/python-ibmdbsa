@@ -2,10 +2,11 @@
 
 from decimal import Decimal
 
-from sqlalchemy import Column, Float, Integer, REAL, Table, select
+from sqlalchemy import Column, Float, Integer, MetaData, REAL, Table, inspect, select
 from sqlalchemy.testing import fixtures
 from sqlalchemy.testing.assertions import eq_
 
+from ibm_db_sa.base import DOUBLE
 from ibm_db_sa.ibm_db import DB2Dialect_ibm_db
 
 
@@ -37,6 +38,14 @@ class TestFloatResults(fixtures.TestBase):
 
     def test_float_default(self):
         self._check(Float(), False)
+
+    def test_double_is_float(self):
+        type_ = DOUBLE()
+        eq_(isinstance(type_, Float), True)
+        eq_(type_.asdecimal, False)
+        eq_(type_.python_type, float)
+        eq_(str(type_.compile(dialect=DB2Dialect_ibm_db())), "DOUBLE")
+        self._check(type_, False)
 
 
 class TestFloatRoundTrip(fixtures.TestBase):
@@ -70,3 +79,36 @@ class TestFloatRoundTrip(fixtures.TestBase):
 
     def test_float_round_trip(self, metadata, connection):
         self._round_trip(metadata, connection, False)
+
+    def test_reflected_double(self, metadata, connection):
+        table = Table(
+            "float_reflect",
+            metadata,
+            Column("id", Integer, primary_key=True, autoincrement=False),
+            Column("amount", DOUBLE()),
+        )
+        table.create(connection)
+        connection.execute(
+            table.insert(),
+            [{"id": i, "amount": value} for i, value in enumerate(VALUES)],
+        )
+        inspector = inspect(connection)
+        schema = connection.dialect.normalize_name(
+            connection.exec_driver_sql("VALUES CURRENT SCHEMA").scalar().strip()
+        )
+        columns = inspector.get_columns("float_reflect", schema=schema)
+        type_ = next(c["type"] for c in columns if c["name"] == "amount")
+        eq_(isinstance(type_, DOUBLE), True)
+        eq_(type_.asdecimal, False)
+        eq_(type_.python_type, float)
+        reflected = Table(
+            "float_reflect", MetaData(), schema=schema, autoload_with=connection
+        )
+        actual = (
+            connection.execute(select(reflected.c.amount).order_by(reflected.c.id))
+            .scalars()
+            .all()
+        )
+        eq_(actual, list(VALUES))
+        for value, result in zip(VALUES, actual):
+            eq_(type(result), type(value))
