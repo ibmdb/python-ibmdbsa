@@ -119,7 +119,9 @@ class DB2Dialect_ibm_db(DB2Dialect):
     supports_statement_cache = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = False
-    supports_native_decimal = False
+    # ibm_db binds Decimal as SQL_C_CHAR without a float conversion, and
+    # ibm_db_dbi returns Decimal for DECIMAL/NUMERIC columns.
+    supports_native_decimal = True
     supports_char_length = True
     supports_default_values = False
     supports_multivalues_insert = True
