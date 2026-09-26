@@ -128,7 +128,11 @@ class DB2Dialect_ibm_db(DB2Dialect):
     colspecs = util.update_copy(
         DB2Dialect.colspecs,
         {
-            sa_types.Numeric: _IBM_Numeric_ibm_db
+            sa_types.Numeric: _IBM_Numeric_ibm_db,
+            # Float subclasses Numeric; without its own entry it would be
+            # adapted to _IBM_Numeric_ibm_db, which ignores Float's
+            # asdecimal result conversion.
+            sa_types.Float: sa_types.Float,
         }
     )
 
