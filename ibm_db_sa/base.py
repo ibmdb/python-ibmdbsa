@@ -224,7 +224,9 @@ class BOOLEAN(sa_types.Boolean):
     __visit_name__ = 'BOOLEAN'
 
 
-class DOUBLE(sa_types.Numeric):
+# DOUBLE is a binary floating-point type and the DBAPI returns float for it,
+# so declare it as a Float (asdecimal=False), not a Numeric.
+class DOUBLE(sa_types.Float):
     __visit_name__ = 'DOUBLE'
 
 
