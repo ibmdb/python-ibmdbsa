@@ -160,7 +160,9 @@ class DB2Dialect_ibm_db(DB2Dialect):
     supports_statement_cache = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = False
-    supports_native_decimal = False
+    # ibm_db binds Decimal as SQL_C_CHAR without a float conversion, and
+    # ibm_db_dbi returns Decimal for DECIMAL/NUMERIC columns.
+    supports_native_decimal = True
     supports_char_length = True
     supports_default_values = False
     supports_multivalues_insert = True
@@ -174,6 +176,10 @@ class DB2Dialect_ibm_db(DB2Dialect):
             # DECFLOAT is a Numeric but keeps its own processors.
             DECFLOAT: DECFLOAT,
             XML: _IBM_XML_ibm_db,
+            # Float subclasses Numeric; without its own entry it would be
+            # adapted to _IBM_Numeric_ibm_db, which ignores Float's
+            # asdecimal result conversion.
+            sa_types.Float: sa_types.Float,
         }
     )
 
@@ -342,7 +348,15 @@ class DB2Dialect_ibm_db(DB2Dialect):
     @log_entry_exit
     def _get_default_schema_name(self, connection):
         logger.debug("Fetching current schema from DB2")
-        schema = connection.connection.get_current_schema()
+        # Ask the server. ibm_db_dbi's get_current_schema() falls back to the
+        # user argument passed to connect(), which is empty when credentials
+        # are supplied in the DSN, so it can return '' for a valid session.
+        if hasattr(connection, "exec_driver_sql"):
+            result = connection.exec_driver_sql("VALUES CURRENT SCHEMA")
+        else:  # SQLAlchemy < 1.4
+            result = connection.execute("VALUES CURRENT SCHEMA")
+        schema = result.scalar()
+        schema = schema.strip() if schema else schema
         logger.debug("Current schema returned: %s", schema)
         normalized_schema_name = self.normalize_name(schema)
         logger.debug("Normalized schema: %s", normalized_schema_name)
