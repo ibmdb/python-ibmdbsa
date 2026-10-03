@@ -299,7 +299,15 @@ class DB2Dialect_ibm_db(DB2Dialect):
     @log_entry_exit
     def _get_default_schema_name(self, connection):
         logger.debug("Fetching current schema from DB2")
-        schema = connection.connection.get_current_schema()
+        # Ask the server. ibm_db_dbi's get_current_schema() falls back to the
+        # user argument passed to connect(), which is empty when credentials
+        # are supplied in the DSN, so it can return '' for a valid session.
+        if hasattr(connection, "exec_driver_sql"):
+            result = connection.exec_driver_sql("VALUES CURRENT SCHEMA")
+        else:  # SQLAlchemy < 1.4
+            result = connection.execute("VALUES CURRENT SCHEMA")
+        schema = result.scalar()
+        schema = schema.strip() if schema else schema
         logger.debug("Current schema returned: %s", schema)
         normalized_schema_name = self.normalize_name(schema)
         logger.debug("Normalized schema: %s", normalized_schema_name)
