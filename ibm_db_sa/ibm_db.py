@@ -29,7 +29,7 @@ from sqlalchemy.engine import result as _result
 from sqlalchemy.engine.url import URL
 from sqlalchemy.exc import ArgumentError
 
-from .base import DB2Dialect, DB2ExecutionContext
+from .base import DB2Dialect, DB2ExecutionContext, DECFLOAT, XML
 from .logger import init_ibmdbsa_logging, log_entry_exit, logger
 
 m = re.match(r"^\s*(\d+)\.(\d+)", SA_VERSION_STR)
@@ -62,6 +62,47 @@ class _IBM_Numeric_ibm_db(sa_types.Numeric):
        else:
            logger.debug("Returning float conversion processor")
            return to_float
+
+
+class _IBM_Binary_ibm_db(sa_types._Binary):
+    """Bind binary values as bytes.
+
+    SQLAlchemy binds binary values through dbapi.Binary, which ibm_db_dbi
+    implements as memoryview. With executemany, ibm_db rejects a memoryview for
+    BINARY, VARBINARY and FOR BIT DATA columns (SQL0302N) and stores its repr
+    text ("<memory at 0x...>") in BLOB columns. bytes work in both paths.
+    """
+
+    def bind_processor(self, dialect):
+        def process(value):
+            return None if value is None else bytes(value)
+        return process
+
+
+# DB2 stores XML parsed, without a declaration. On fetch the CLI serializes it
+# with a byte order mark and a UTF-16 declaration, even for a document stored
+# with a UTF-8 declaration, which is wrong for a Python str.
+_CLI_XML_PREFIX = re.compile(r'\A\ufeff?(?:<\?xml version="1\.0" encoding="UTF-16" \?>)?')
+
+
+class _IBM_XML_ibm_db(XML):
+    def result_processor(self, dialect, coltype):
+        def process(value):
+            if isinstance(value, str):
+                return _CLI_XML_PREFIX.sub("", value, count=1)
+            return value
+        return process
+
+
+_DISCONNECT_MESSAGES = (
+    'Connection is not active',
+    'connection is no longer active',
+    'Connection Resource cannot be found',
+    'SQL30081N',
+    'CLI0108E',
+    'CLI0106E',
+    'SQL1224N',
+)
 
 
 class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
@@ -131,6 +172,10 @@ class DB2Dialect_ibm_db(DB2Dialect):
         DB2Dialect.colspecs,
         {
             sa_types.Numeric: _IBM_Numeric_ibm_db,
+            sa_types._Binary: _IBM_Binary_ibm_db,
+            # DECFLOAT is a Numeric but keeps its own processors.
+            DECFLOAT: DECFLOAT,
+            XML: _IBM_XML_ibm_db,
             # Float subclasses Numeric; without its own entry it would be
             # adapted to _IBM_Numeric_ibm_db, which ignores Float's
             # asdecimal result conversion.
@@ -317,27 +362,25 @@ class DB2Dialect_ibm_db(DB2Dialect):
         logger.debug("Normalized schema: %s", normalized_schema_name)
         return normalized_schema_name
 
-    # Checks if the DB_API driver error indicates an invalid connection
+    # Checks if the DB_API driver error indicates an invalid connection. A
+    # connection lost while fetching surfaces as the base ibm_db_dbi.Error.
     @log_entry_exit
     def is_disconnect(self, ex, connection, cursor):
-        logger.debug("Checking if exception indicates disconnect")
-        logger.debug("Exception received: %s", ex)
-        if isinstance(ex, (self.dbapi.ProgrammingError,
-                           self.dbapi.OperationalError)):
-            connection_errors = ('Connection is not active',
-                                 'connection is no longer active',
-                                 'Connection Resource cannot be found',
-                                 'SQL30081N',
-                                 'CLI0108E',
-                                 'CLI0106E',
-                                 'SQL1224N')
-            for err_msg in connection_errors:
+        if isinstance(ex, self.dbapi.Error):
+            for err_msg in _DISCONNECT_MESSAGES:
                 if err_msg in str(ex):
                     logger.debug("Disconnect detected due to error: %s", err_msg)
                     return True
-        else:
-            logger.debug("Exception type does not indicate disconnect")
         return False
 
+    # After a server restart or network failure ibm_db_dbi raises CLI0106E
+    # ("Connection is closed") from close(); the pool then logged an error for
+    # every connection it discarded.
+    def do_close(self, dbapi_connection):
+        try:
+            dbapi_connection.close()
+        except self.dbapi.Error as err:
+            if "CLI0106E" not in str(err):
+                raise
 
 dialect = DB2Dialect_ibm_db

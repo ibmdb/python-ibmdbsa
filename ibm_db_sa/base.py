@@ -21,7 +21,7 @@
 """
 import sys
 import sqlalchemy
-import datetime, re
+import datetime, decimal, re
 from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
 from sqlalchemy import util
@@ -230,6 +230,30 @@ class DOUBLE(sa_types.Float):
     __visit_name__ = 'DOUBLE'
 
 
+class DECFLOAT(sa_types.Numeric):
+    """DB2 DECFLOAT(16) or DECFLOAT(34).
+
+    The ibm_db DBAPI returns DECFLOAT values as str; convert them to Decimal
+    (or float with asdecimal=False) and bind Decimal values as exact text.
+    """
+    __visit_name__ = 'DECFLOAT'
+
+    def __init__(self, precision=34, asdecimal=True):
+        super().__init__(precision=precision, asdecimal=asdecimal)
+
+    def bind_processor(self, dialect):
+        def process(value):
+            return str(value) if isinstance(value, decimal.Decimal) else value
+        return process
+
+    def result_processor(self, dialect, coltype):
+        convert = decimal.Decimal if self.asdecimal else float
+
+        def process(value):
+            return None if value is None else convert(str(value))
+        return process
+
+
 class LONGVARCHAR(sa_types.VARCHAR):
     __visit_name_ = 'LONGVARCHAR'
 
@@ -285,6 +309,9 @@ ischema_names = {
     'XML': XML,
     'GRAPHIC': GRAPHIC,
     'VARGRAPHIC': VARGRAPHIC,
+    'DECFLOAT': DECFLOAT,
+    'BINARY': sa_types.BINARY,
+    'VARBINARY': sa_types.VARBINARY,
     'LONGVARGRAPHIC': LONGVARGRAPHIC,
     'DBCLOB': DBCLOB
 }
@@ -302,6 +329,10 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        sql = "DATE"
        logger.debug(f"Type rendering -> DATE -> {sql}")
        return sql
+
+   @log_entry_exit
+   def visit_DECFLOAT(self, type_, **kw):
+       return "DECFLOAT(%d)" % (type_.precision or 34)
 
    @log_entry_exit
    def visit_TIME(self, type_, **kw):
@@ -1482,6 +1513,13 @@ class DB2Dialect(default.DefaultDialect):
         indexes = self._reflector.get_indexes(connection, table_name, schema=schema, **kw)
         logger.debug(f"Indexes fetched -> count={len(indexes)}")
         return indexes
+
+    @log_entry_exit
+    def get_check_constraints(self, connection, table_name, schema=None, **kw):
+        reflect = getattr(self._reflector, "get_check_constraints", None)
+        if reflect is None:
+            raise NotImplementedError()
+        return reflect(connection, table_name, schema=schema, **kw)
 
     @log_entry_exit
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):

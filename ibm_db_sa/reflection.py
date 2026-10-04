@@ -184,6 +184,35 @@ class DB2Reflector(BaseReflector):
       Column("COLNAMES", CoerceUnicode, key="colnames"),
       Column("UNIQUERULE", CoerceUnicode, key="uniquerule"),
       Column("SYSTEM_REQUIRED", sa_types.SMALLINT, key="system_required"),
+      Column("INDSCHEMA", CoerceUnicode, key="indschema"),
+      Column("INDEXTYPE", CoerceUnicode, key="indextype"),
+      schema="SYSCAT")
+
+    sys_indexcoluse = Table("INDEXCOLUSE", ischema,
+      Column("INDSCHEMA", CoerceUnicode, key="indschema"),
+      Column("INDNAME", CoerceUnicode, key="indname"),
+      Column("COLNAME", CoerceUnicode, key="colname"),
+      Column("COLSEQ", sa_types.SMALLINT, key="colseq"),
+      Column("COLORDER", CoerceUnicode, key="colorder"),
+      schema="SYSCAT")
+
+    sys_references = Table("REFERENCES", ischema,
+      Column("CONSTNAME", CoerceUnicode, key="constname"),
+      Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
+      Column("TABNAME", CoerceUnicode, key="tabname"),
+      Column("REFKEYNAME", CoerceUnicode, key="refkeyname"),
+      Column("REFTABSCHEMA", CoerceUnicode, key="reftabschema"),
+      Column("REFTABNAME", CoerceUnicode, key="reftabname"),
+      Column("DELETERULE", CoerceUnicode, key="deleterule"),
+      Column("UPDATERULE", CoerceUnicode, key="updaterule"),
+      schema="SYSCAT")
+
+    sys_checks = Table("CHECKS", ischema,
+      Column("CONSTNAME", CoerceUnicode, key="constname"),
+      Column("TABSCHEMA", CoerceUnicode, key="tabschema"),
+      Column("TABNAME", CoerceUnicode, key="tabname"),
+      Column("TYPE", CoerceUnicode, key="type"),
+      Column("TEXT", CoerceUnicode, key="text"),
       schema="SYSCAT")
 
     sys_tabconst = Table("TABCONST", ischema,
@@ -198,6 +227,7 @@ class DB2Reflector(BaseReflector):
       Column("TABNAME", CoerceUnicode, key="tabname"),
       Column("CONSTNAME", CoerceUnicode, key="constname"),
       Column("COLNAME", CoerceUnicode, key="colname"),
+      Column("COLSEQ", sa_types.SMALLINT, key="colseq"),
       schema="SYSCAT")
 
     sys_foreignkeys = Table("SQLFOREIGNKEYS", ischema,
@@ -227,6 +257,7 @@ class DB2Reflector(BaseReflector):
       Column("IDENTITY", CoerceUnicode, key="identity"),
       Column("GENERATED", CoerceUnicode, key="generated"),
       Column("REMARKS", CoerceUnicode, key="remarks"),
+      Column("CODEPAGE", sa_types.SMALLINT, key="codepage"),
       schema="SYSCAT")
 
     sys_views = Table("VIEWS", ischema,
@@ -276,32 +307,19 @@ class DB2Reflector(BaseReflector):
             raise
 
     @log_entry_exit
-    def has_sequence(self, connection, sequence_name, schema=None):
-        try:
-            logger.debug(f"Checking sequence existence -> schema={schema}, sequence={sequence_name}")
-            current_schema = self.denormalize_name(schema or self.default_schema_name)
-            sequence_name = self.denormalize_name(sequence_name)
-            logger.debug(
-                f"Resolved identifiers -> "
-                f"schema={current_schema}, "
-                f"sequence={sequence_name}"
+    def has_sequence(self, connection, sequence_name, schema=None, **kw):
+        # SQLAlchemy 2's Inspector passes info_cache and other keywords.
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        sequence_name = self.denormalize_name(sequence_name)
+        if current_schema:
+            whereclause = sql.and_(
+                self.sys_sequences.c.seqschema == current_schema,
+                self.sys_sequences.c.seqname == sequence_name
             )
-            if current_schema:
-                whereclause = sql.and_(
-                    self.sys_sequences.c.seqschema == current_schema,
-                    self.sys_sequences.c.seqname == sequence_name
-                )
-            else:
-                whereclause = self.sys_sequences.c.seqname == sequence_name
-            s = sql.select(self.sys_sequences.c.seqname).where(whereclause)
-            logger.debug(f"Generated has_sequence SQL -> {s}")
-            result = connection.execute(s).first() is not None
-            logger.debug(f"has_sequence result -> sequence={sequence_name}, exists={result}")
-            return result
-        except Exception as e:
-            logger.error(f"Error checking sequence existence: {e}")
-            logger.exception("Stack trace in has_sequence")
-            raise
+        else:
+            whereclause = self.sys_sequences.c.seqname == sequence_name
+        s = sql.select(self.sys_sequences.c.seqname).where(whereclause)
+        return connection.execute(s).first() is not None
 
     @reflection.cache
     @log_entry_exit
@@ -435,106 +453,91 @@ class DB2Reflector(BaseReflector):
     @reflection.cache
     @log_entry_exit
     def get_columns(self, connection, table_name, schema=None, **kw):
-        try:
-            current_schema = self.denormalize_name(schema or self.default_schema_name)
-            table_name = self.denormalize_name(table_name)
-            logger.debug(f"Fetching columns -> schema={current_schema}, table={table_name}")
-            syscols = self.sys_columns
-            query = (
-                sql.select(
-                    syscols.c.colname, syscols.c.typename,
-                    syscols.c.defaultval, syscols.c.nullable,
-                    syscols.c.length, syscols.c.scale,
-                    syscols.c.identity, syscols.c.generated,
-                    syscols.c.remarks
-                )
-                .where(and_(
-                    syscols.c.tabschema == current_schema,
-                    syscols.c.tabname == table_name
-                ))
-                .order_by(syscols.c.colno)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        syscols = self.sys_columns
+        query = (
+            sql.select(
+                syscols.c.colname, syscols.c.typename,
+                syscols.c.defaultval, syscols.c.nullable,
+                syscols.c.length, syscols.c.scale,
+                syscols.c.identity, syscols.c.generated,
+                syscols.c.remarks, syscols.c.codepage
             )
-            logger.debug(f"Generated get_columns SQL -> {query}")
-            sa_columns = []
-            for r in connection.execute(query):
-                raw_type = r[1].upper()
-                logger.debug(
-                    f"Processing column -> "
-                    f"name={r[0]}, type={raw_type}, "
-                    f"length={r[4]}, scale={r[5]}"
-                )
-                if raw_type in ['DECIMAL', 'NUMERIC']:
-                    coltype = self.ischema_names.get(raw_type)(int(r[4]), int(r[5]))
-                elif raw_type in ['CHARACTER', 'CHAR', 'VARCHAR',
-                                  'GRAPHIC', 'VARGRAPHIC']:
-                    coltype = self.ischema_names.get(raw_type)(int(r[4]))
-                else:
-                    try:
-                        coltype = self.ischema_names[raw_type]
-                    except KeyError:
-                        logger.warning(
-                            f"Unrecognized column type '{raw_type}' "
-                            f"for column '{r[0]}'"
-                        )
-                        coltype = sa_types.NULLTYPE
-                column_info = {
-                    'name': self.normalize_name(r[0]),
-                    'type': coltype,
-                    'nullable': r[3] == 'Y',
-                    'default': r[2] or None,
-                    'autoincrement': (r[6] == 'Y') and (r[7] != ' '),
-                    'comment': r[8] or None,
-                }
-                logger.debug(f"Column reflected -> {column_info}")
-                sa_columns.append(column_info)
-            logger.debug(f"Total columns reflected -> count={len(sa_columns)}")
-            return sa_columns
-        except Exception as e:
-            logger.error(f"Error reflecting columns: {e}")
-            logger.exception("Stack trace in get_columns")
-            raise
+            .where(and_(
+                syscols.c.tabschema == current_schema,
+                syscols.c.tabname == table_name
+            ))
+            .order_by(syscols.c.colno)
+        )
+        sa_columns = []
+        for r in connection.execute(query):
+            raw_type = r[1].upper()
+            if raw_type in ('CHARACTER', 'CHAR', 'VARCHAR') and r[9] == 0:
+                # FOR BIT DATA: the DBAPI returns bytes.
+                binary = sa_types.VARBINARY if raw_type == 'VARCHAR' else sa_types.BINARY
+                coltype = binary(int(r[4]))
+            elif raw_type in ['DECIMAL', 'NUMERIC']:
+                coltype = self.ischema_names.get(raw_type)(int(r[4]), int(r[5]))
+            elif raw_type in ['CHARACTER', 'CHAR', 'VARCHAR',
+                              'GRAPHIC', 'VARGRAPHIC', 'BINARY', 'VARBINARY']:
+                coltype = self.ischema_names.get(raw_type)(int(r[4]))
+            elif raw_type == 'DECFLOAT':
+                # LENGTH is the storage size: 8 bytes for 16 digits, 16 for 34.
+                coltype = self.ischema_names[raw_type](16 if int(r[4]) == 8 else 34)
+            else:
+                try:
+                    coltype = self.ischema_names[raw_type]
+                except KeyError:
+                    logger.warning(
+                        f"Unrecognized column type '{raw_type}' "
+                        f"for column '{r[0]}'"
+                    )
+                    coltype = sa_types.NULLTYPE
+            sa_columns.append({
+                'name': self.normalize_name(r[0]),
+                'type': coltype,
+                'nullable': r[3] == 'Y',
+                'default': r[2] or None,
+                'autoincrement': (r[6] == 'Y') and (r[7] != ' '),
+                'comment': r[8] or None,
+            })
+        return sa_columns
+
+    def _constraint_columns(self, connection, table_name, schema, kind):
+        """(constraint name, column name) rows in key order."""
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        keycol, const = self.sys_keycoluse, self.sys_tabconst
+        query = (
+            sql.select(keycol.c.constname, keycol.c.colname)
+            .select_from(join(keycol, const, and_(
+                keycol.c.tabschema == const.c.tabschema,
+                keycol.c.tabname == const.c.tabname,
+                keycol.c.constname == const.c.constname,
+            )))
+            .where(and_(
+                const.c.tabschema == current_schema,
+                const.c.tabname == table_name,
+                const.c.type == kind,
+            ))
+            .order_by(keycol.c.constname, keycol.c.colseq)
+        )
+        return [
+            (self.normalize_name(name), self.normalize_name(col))
+            for name, col in connection.execute(query)
+        ]
 
     @reflection.cache
     @log_entry_exit
     def get_pk_constraint(self, connection, table_name, schema=None, **kw):
-        try:
-            current_schema = self.denormalize_name(schema or self.default_schema_name)
-            table_name = self.denormalize_name(table_name)
-            logger.debug(f"Fetching primary key -> schema={current_schema}, table={table_name}")
-            sysindexes = self.sys_indexes
-            col_finder = re.compile(r"(\w+)")
-            query = (
-                sql.select(sysindexes.c.colnames, sysindexes.c.indname)
-                .where(and_(
-                    sysindexes.c.tabschema == current_schema,
-                    sysindexes.c.tabname == table_name,
-                    sysindexes.c.uniquerule == 'P'
-                ))
-                .order_by(
-                    sysindexes.c.tabschema,
-                    sysindexes.c.tabname
-                ))
-            logger.debug(f"Generated get_pk_constraint SQL -> {query}")
-            pk_columns = []
-            pk_name = None
-            for r in connection.execute(query):
-                cols = col_finder.findall(r[0])
-                pk_columns.extend(cols)
-                if not pk_name:
-                    pk_name = self.normalize_name(r[1])
-            normalized_columns = [self.normalize_name(col) for col in pk_columns]
-            logger.debug(
-                f"Primary key reflected -> "
-                f"name={pk_name}, columns={normalized_columns}"
-            )
-            return {
-                "constrained_columns": normalized_columns,
-                "name": pk_name
-            }
-        except Exception as e:
-            logger.error(f"Error reflecting primary key: {e}")
-            logger.exception("Stack trace in get_pk_constraint")
-            raise
+        # Read the constraint's own name and columns in key order; splitting
+        # SYSCAT.INDEXES.COLNAMES on \w+ broke names such as "AMT$X".
+        rows = self._constraint_columns(connection, table_name, schema, 'P')
+        return {
+            "constrained_columns": [col for _, col in rows],
+            "name": rows[0][0] if rows else None,
+        }
 
     @reflection.cache
     @log_entry_exit
@@ -570,68 +573,64 @@ class DB2Reflector(BaseReflector):
     @reflection.cache
     @log_entry_exit
     def get_foreign_keys(self, connection, table_name, schema=None, **kw):
-        try:
-            default_schema = self.default_schema_name
-            current_schema = self.denormalize_name(schema or default_schema)
-            normalized_default_schema = self.normalize_name(default_schema)
-            table_name = self.denormalize_name(table_name)
-            logger.debug(
-                f"Fetching foreign keys -> "
-                f"schema={current_schema}, table={table_name}"
+        # Scope the constrained table by schema and name, and pair columns by
+        # key position, so a same-named table in another schema does not
+        # contribute its keys and composite keys keep their order.
+        default_schema = self.normalize_name(self.default_schema_name)
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        ref = self.sys_references
+        fk = self.sys_keycoluse.alias("fk")
+        pk = self.sys_keycoluse.alias("pk")
+        query = (
+            sql.select(
+                ref.c.constname, fk.c.colname, ref.c.reftabschema,
+                ref.c.reftabname, pk.c.colname, ref.c.deleterule,
+                ref.c.updaterule,
             )
-            sysfkeys = self.sys_foreignkeys
-            systbl = self.sys_tables
-            query = (
-                sql.select(
-                    sysfkeys.c.fkname, sysfkeys.c.fktabschema,
-                    sysfkeys.c.fktabname, sysfkeys.c.fkcolname,
-                    sysfkeys.c.pkname, sysfkeys.c.pktabschema,
-                    sysfkeys.c.pktabname, sysfkeys.c.pkcolname
-                )
-                .select_from(
-                    join(
-                        systbl,
-                        sysfkeys,
-                        sql.and_(
-                            systbl.c.tabname == sysfkeys.c.pktabname,
-                            systbl.c.tabschema == sysfkeys.c.pktabschema
-                        )
-                    )
-                )
-                .where(systbl.c.type == 'T')
-                .where(systbl.c.tabschema == current_schema)
-                .where(sysfkeys.c.fktabname == table_name)
-                .order_by(systbl.c.tabname)
+            .select_from(
+                join(ref, fk, and_(
+                    fk.c.tabschema == ref.c.tabschema,
+                    fk.c.tabname == ref.c.tabname,
+                    fk.c.constname == ref.c.constname,
+                )).join(pk, and_(
+                    pk.c.tabschema == ref.c.reftabschema,
+                    pk.c.tabname == ref.c.reftabname,
+                    pk.c.constname == ref.c.refkeyname,
+                    pk.c.colseq == fk.c.colseq,
+                ))
             )
-            logger.debug(f"Generated get_foreign_keys SQL -> {query}")
-            fschema = {}
-            for r in connection.execute(query):
-                fk_name = r[0]
-                if fk_name not in fschema:
-                    referred_schema = self.normalize_name(r[5])
-                    # if no schema specified and referred schema here is the
-                    # default, then set to None
-                    if schema is None and \
-                            referred_schema == normalized_default_schema:
-                        referred_schema = None
-                    fschema[fk_name] = {
-                        'name': self.normalize_name(fk_name),
-                        'constrained_columns': [self.normalize_name(r[3])],
-                        'referred_schema': referred_schema,
-                        'referred_table': self.normalize_name(r[6]),
-                        'referred_columns': [self.normalize_name(r[7])]
-                    }
-                    logger.debug(f"Foreign key discovered -> {fschema[fk_name]}")
-                else:
-                    fschema[fk_name]['constrained_columns'].append(self.normalize_name(r[3]))
-                    fschema[fk_name]['referred_columns'].append(self.normalize_name(r[7]))
-            result = [value for value in fschema.values()]
-            logger.debug(f"Total foreign keys reflected -> count={len(result)}")
-            return result
-        except Exception as e:
-            logger.error(f"Error reflecting foreign keys: {e}")
-            logger.exception("Stack trace in get_foreign_keys")
-            raise
+            .where(and_(
+                ref.c.tabschema == current_schema,
+                ref.c.tabname == table_name,
+            ))
+            .order_by(ref.c.constname, fk.c.colseq)
+        )
+        rules = {'C': 'CASCADE', 'N': 'SET NULL', 'R': 'RESTRICT'}
+        fschema = {}
+        for name, col, ref_schema, ref_table, ref_col, on_delete, on_update in \
+                connection.execute(query):
+            if name not in fschema:
+                # SYSCAT.REFERENCES pads schema names.
+                referred_schema = self.normalize_name(ref_schema.rstrip())
+                if schema is None and referred_schema == default_schema:
+                    referred_schema = None
+                options = {}
+                if on_delete in rules:
+                    options['ondelete'] = rules[on_delete]
+                if on_update == 'R':
+                    options['onupdate'] = 'RESTRICT'
+                fschema[name] = {
+                    'name': self.normalize_name(name),
+                    'constrained_columns': [],
+                    'referred_schema': referred_schema,
+                    'referred_table': self.normalize_name(ref_table),
+                    'referred_columns': [],
+                    'options': options,
+                }
+            fschema[name]['constrained_columns'].append(self.normalize_name(col))
+            fschema[name]['referred_columns'].append(self.normalize_name(ref_col))
+        return list(fschema.values())
 
     @reflection.cache
     @log_entry_exit
@@ -694,126 +693,68 @@ class DB2Reflector(BaseReflector):
     @reflection.cache
     @log_entry_exit
     def get_indexes(self, connection, table_name, schema=None, **kw):
-        try:
-            current_schema = self.denormalize_name(schema or self.default_schema_name)
-            table_name = self.denormalize_name(table_name)
-            logger.debug(f"Fetching indexes -> schema={current_schema}, table={table_name}")
-            sysidx = self.sys_indexes
-            query = (
-                sql.select(sysidx.c.indname, sysidx.c.colnames,
-                    sysidx.c.uniquerule, sysidx.c.system_required
-                )
-                .where(and_(
-                    sysidx.c.tabschema == current_schema,
-                    sysidx.c.tabname == table_name
-                ))
-                .order_by(sysidx.c.tabname)
-            )
-            logger.debug(f"Generated get_indexes SQL -> {query}")
-            indexes = []
-            col_finder = re.compile(r"(\w+)")
-            for r in connection.execute(query):
-                index_name = r[0]
-                column_text = r[1]
-                unique_rule = r[2]
-                system_required = r[3]
-                logger.debug(
-                    f"Processing index row -> "
-                    f"name={index_name}, unique_rule={unique_rule}, "
-                    f"system_required={system_required}"
-                )
-                if unique_rule == 'P':
-                    logger.debug(f"Skipping primary key index -> {index_name}")
-                    continue
-                if unique_rule == 'U' and system_required != 0:
-                    logger.debug(f"Skipping system-required unique index -> {index_name}")
-                    continue
-                if 'sqlnotapplicable' in column_text.lower():
-                    logger.debug(f"Skipping internal index -> {index_name}")
-                    continue
-                normalized_columns = [self.normalize_name(col) for col in col_finder.findall(column_text)]
-                index_info = {
-                    'name': self.normalize_name(index_name),
-                    'column_names': normalized_columns,
-                    'unique': unique_rule == 'U'
-                }
-                logger.debug(f"Index reflected -> {index_info}")
-                indexes.append(index_info)
-            logger.debug(f"Total indexes reflected -> count={len(indexes)}")
-            return indexes
-        except Exception as e:
-            logger.error(f"Error reflecting indexes: {e}")
-            logger.exception("Stack trace in get_indexes")
-            raise
+        # Read columns from SYSCAT.INDEXCOLUSE (splitting COLNAMES on \w+
+        # broke names such as "AMT$X" and lost DESC), and skip DB2's internal
+        # XML region/path indexes, which are not user indexes.
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        idx, cols = self.sys_indexes, self.sys_indexcoluse
+        query = (
+            sql.select(idx.c.indname, idx.c.uniquerule, cols.c.colname, cols.c.colorder)
+            .select_from(join(idx, cols, and_(
+                cols.c.indschema == idx.c.indschema,
+                cols.c.indname == idx.c.indname,
+            )))
+            .where(and_(
+                idx.c.tabschema == current_schema,
+                idx.c.tabname == table_name,
+                idx.c.uniquerule != 'P',
+                # System-required unique indexes back unique constraints,
+                # which get_unique_constraints reports.
+                not_(and_(idx.c.uniquerule == 'U', idx.c.system_required != 0)),
+                idx.c.indextype.in_(('REG', 'CLUS')),
+            ))
+            .order_by(idx.c.indname, cols.c.colseq)
+        )
+        indexes = {}
+        for name, rule, col, order in connection.execute(query):
+            index = indexes.setdefault(name, {
+                'name': self.normalize_name(name),
+                'column_names': [],
+                'unique': rule == 'U',
+            })
+            index['column_names'].append(self.normalize_name(col))
+            if order == 'D':
+                index.setdefault('column_sorting', {})[self.normalize_name(col)] = ('desc',)
+        return list(indexes.values())
 
     @reflection.cache
     @log_entry_exit
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
-        try:
-            current_schema = self.denormalize_name(schema or self.default_schema_name)
-            table_name = self.denormalize_name(table_name)
-            logger.debug(
-                f"Fetching unique constraints -> "
-                f"schema={current_schema}, table={table_name}"
-            )
-            syskeycol = self.sys_keycoluse
-            sysconst = self.sys_tabconst
-            query = (
-                sql.select(
-                    syskeycol.c.constname,
-                    syskeycol.c.colname
-                )
-                .select_from(
-                    join(
-                        syskeycol,
-                        sysconst,
-                        and_(
-                            syskeycol.c.constname == sysconst.c.constname,
-                            syskeycol.c.tabschema == sysconst.c.tabschema,
-                            syskeycol.c.tabname == sysconst.c.tabname,
-                        ),
-                    )
-                )
-                .where(
-                    and_(
-                        sysconst.c.tabname == table_name,
-                        sysconst.c.tabschema == current_schema,
-                        sysconst.c.type == "U",
-                    )
-                )
-                .order_by(syskeycol.c.constname)
-            )
-            logger.debug(f"Generated get_unique_constraints SQL -> {query}")
-            uniqueConsts = []
-            currConst = None
-            for r in connection.execute(query):
-                constraint_name = r[0]
-                column_name = self.normalize_name(r[1])
-                if currConst == constraint_name:
-                    uniqueConsts[-1]["column_names"].append(column_name)
-                    logger.debug(
-                        f"Appending column to constraint -> "
-                        f"name={constraint_name}, column={column_name}"
-                    )
-                else:
-                    currConst = constraint_name
-                    constraint_info = {
-                        "name": self.normalize_name(currConst),
-                        "column_names": [column_name],
-                    }
-                    logger.debug(f"New unique constraint discovered -> {constraint_info}")
-                    uniqueConsts.append(constraint_info)
-            logger.debug(
-                f"Total unique constraints reflected -> "
-                f"count={len(uniqueConsts)}"
-            )
-            return uniqueConsts
-        except Exception as e:
-            logger.error(f"Error reflecting unique constraints: {e}")
-            logger.exception("Stack trace in get_unique_constraints")
-            raise
+        constraints = {}
+        for name, col in self._constraint_columns(connection, table_name, schema, 'U'):
+            constraints.setdefault(name, []).append(col)
+        return [{'name': k, 'column_names': v} for k, v in constraints.items()]
 
-
+    @reflection.cache
+    @log_entry_exit
+    def get_check_constraints(self, connection, table_name, schema=None, **kw):
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        checks = self.sys_checks
+        query = (
+            sql.select(checks.c.constname, checks.c.text)
+            .where(and_(
+                checks.c.tabschema == current_schema,
+                checks.c.tabname == table_name,
+                checks.c.type == 'C',
+            ))
+            .order_by(checks.c.constname)
+        )
+        return [
+            {'name': self.normalize_name(name), 'sqltext': text}
+            for name, text in connection.execute(query)
+        ]
 class AS400Reflector(BaseReflector):
 
     ischema = MetaData()
