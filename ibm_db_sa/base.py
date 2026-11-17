@@ -22,6 +22,7 @@
 import sys
 import sqlalchemy
 import datetime, decimal, re
+import itertools
 from sqlalchemy import types as sa_types
 from sqlalchemy import schema as sa_schema
 from sqlalchemy import util
@@ -29,6 +30,14 @@ from sqlalchemy import exc
 from sqlalchemy.sql.elements import BindParameter
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql import operators
+
+# _de_clone strips clone annotations from FROM objects; it may be missing on
+# older SQLAlchemy, so fall back to a no-op returning elements unchanged.
+try:
+    from sqlalchemy.sql.compiler import _de_clone
+except Exception:  # pragma: no cover
+    def _de_clone(elements):
+        return elements
 from sqlalchemy.engine import default
 from sqlalchemy import event
 from sqlalchemy.engine import Engine
@@ -350,8 +359,15 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        return sql
 
    def visit_BOOLEAN(self, type_, **kw):
-       sql = "BOOLEAN"
-       logger.debug(f"Type rendering -> BOOLEAN -> {sql}")
+       # Db2 for i (AS/400): SQLAlchemy drives booleans as integers
+       # (supports_native_boolean=False), and a native BOOLEAN column does not
+       # reliably round-trip those 0/1 values through the CLI driver, so store
+       # booleans as SMALLINT there. LUW / z-OS keep the native BOOLEAN type.
+       check_server = getattr(DB2Dialect, "serverType", None)
+       sql = "SMALLINT" if check_server == "AS" else "BOOLEAN"
+       logger.debug(
+           f"Type rendering -> BOOLEAN -> serverType={check_server}, sql={sql}"
+       )
        return sql
 
    def visit_INT(self, type_, **kw):
@@ -478,11 +494,23 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        logger.debug("Redirecting float to FLOAT")
        return self.visit_FLOAT(type_, **kw)
 
+   def _as400_unicode_ccsid(self, base_sql, graphic=False):
+       # Db2 for i (AS/400): character columns created with the job's default
+       # CCSID garble non-ASCII data (it round-trips as U+FFFD). Tag string
+       # columns with a Unicode CCSID so Unicode/Text/String data round-trips:
+       # SBCS/MBCS types use UTF-8 (1208); GRAPHIC types use UTF-16 (1200).
+       # This is a no-op on every other Db2 server (LUW / z-OS unchanged).
+       if getattr(DB2Dialect, "serverType", None) != "AS":
+           return base_sql
+       return f"{base_sql} CCSID {1200 if graphic else 1208}"
+
    def visit_unicode(self, type_, **kw):
        check_server = getattr(DB2Dialect, "serverType")
        base_sql = self.visit_VARGRAPHIC(type_, **kw)
        if check_server == "DB2":
            sql = base_sql + " CCSID 1200"
+       elif check_server == "AS":
+           sql = self._as400_unicode_ccsid(base_sql, graphic=True)
        else:
            sql = base_sql
        logger.debug(
@@ -492,16 +520,41 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        return sql
 
    def visit_unicode_text(self, type_, **kw):
-       logger.debug("Redirecting unicode_text to LONGVARGRAPHIC")
-       return self.visit_LONGVARGRAPHIC(type_, **kw)
+       # Map UnicodeText to DBCLOB instead of the deprecated LONG VARGRAPHIC,
+       # which round-trips Unicode unreliably across CLI driver versions.
+       logger.debug("Redirecting unicode_text to DBCLOB")
+       return self._as400_unicode_ccsid(
+           self.visit_DBCLOB(type_, **kw), graphic=True
+       )
+
+   def visit_enum(self, type_, **kw):
+       # Render Enum as VARCHAR(n CODEUNITS32) so Db2 counts characters, not
+       # bytes, preventing multi-byte UTF-8 members from overflowing (SQL0302N).
+       # Db2 for i (AS/400) does not accept the CODEUNITS32 string unit in a
+       # column definition (SQL0104N), so emit VARCHAR(n) CCSID 1208 there,
+       # which both parses and stores multi-byte members correctly.
+       length = type_.length
+       check_server = getattr(DB2Dialect, "serverType")
+       if length:
+           if check_server == "AS":
+               sql = f"VARCHAR({length}) CCSID 1208"
+           else:
+               sql = f"VARCHAR({length} CODEUNITS32)"
+       else:
+           sql = self.visit_VARCHAR(type_, **kw)
+       logger.debug(
+           f"Type rendering -> ENUM -> length={length}, "
+           f"serverType={check_server}, sql={sql}"
+       )
+       return sql
 
    def visit_string(self, type_, **kw):
        logger.debug("Redirecting string to VARCHAR")
-       return self.visit_VARCHAR(type_, **kw)
+       return self._as400_unicode_ccsid(self.visit_VARCHAR(type_, **kw))
 
    def visit_TEXT(self, type_, **kw):
        logger.debug("Redirecting TEXT to CLOB")
-       return self.visit_CLOB(type_, **kw)
+       return self._as400_unicode_ccsid(self.visit_CLOB(type_, **kw))
 
    def visit_large_binary(self, type_, **kw):
        logger.debug("Redirecting large_binary to BLOB")
@@ -525,6 +578,46 @@ class DB2Compiler(compiler.SQLCompiler):
         logger.debug(f"Generating CTE preamble -> recursive={recursive}")
         return "WITH"
 
+    def _as400_empty_set_null_cast(self, type_):
+        # Return a typed NULL ("CAST(NULL AS <db-type>)") that is compatible
+        # with the compared column, so the always-false / always-true empty-IN
+        # guard is accepted by Db2 for i. The exact precision is irrelevant
+        # because the surrounding predicate can never match.
+        if isinstance(type_, sa_types.Integer):
+            db_type = "INTEGER"
+        elif isinstance(type_, sa_types.Numeric):
+            db_type = "DECIMAL(31, 8)"
+        elif isinstance(type_, (sa_types.String, sa_types.Enum)):
+            db_type = "VARCHAR(1)"
+        else:
+            db_type = "VARCHAR(1)"
+        return f"CAST(NULL AS {db_type})"
+
+    def visit_empty_set_op_expr(self, type_, expand_op, **kw):
+        # Db2 for i (AS/400) rejects a bare NULL literal inside an IN predicate
+        # (SQL0206N "NULL is not valid in the context where it is used").
+        # Emit a typed NULL via CAST so the empty-set expansion is accepted.
+        # Every other Db2 server keeps SQLAlchemy's default rendering so the
+        # LUW / z/OS behavior is unchanged.
+        if getattr(self.dialect, "dbms_name", None) != "AS":
+            return super(DB2Compiler, self).visit_empty_set_op_expr(
+                type_, expand_op, **kw
+            )
+
+        nulls = [self._as400_empty_set_null_cast(element) for element in type_]
+        if expand_op is operators.not_in_op:
+            if len(type_) > 1:
+                return "(%s)) OR (1 = 1" % (", ".join(nulls))
+            else:
+                return "%s) OR (1 = 1" % nulls[0]
+        elif expand_op is operators.in_op:
+            if len(type_) > 1:
+                return "(%s)) AND (1 != 1" % (", ".join(nulls))
+            else:
+                return "%s) AND (1 != 1" % nulls[0]
+        else:
+            return self.visit_empty_set_expr(type_)
+
     @log_entry_exit
     def visit_now_func(self, fn, **kw):
         logger.debug("Rendering NOW function as CURRENT_TIMESTAMP")
@@ -532,14 +625,9 @@ class DB2Compiler(compiler.SQLCompiler):
 
     @log_entry_exit
     def for_update_clause(self, select, **kw):
-        # Version-agnostic FOR UPDATE handling (SQLAlchemy 0.7.3 -> 2.0.x).
-        #
-        # SQLAlchemy >= 1.0 stores the lock request on ``select._for_update_arg``
-        # (a ForUpdateArg object, or None when no locking was requested) and the
-        # legacy ``select.for_update`` attribute was removed.
-        #
-        # SQLAlchemy < 1.0 exposes the legacy ``select.for_update`` attribute
-        # whose value is False / True / "read" / "nowait" / "read_nowait" / etc.
+        # Version-agnostic FOR UPDATE handling: SQLAlchemy >= 1.0 uses
+        # ``select._for_update_arg`` (ForUpdateArg or None); older versions use the
+        # legacy ``select.for_update`` attribute (False/True/"read"/"read_nowait"/etc.).
         if hasattr(select, "_for_update_arg"):
             # Modern API (SQLAlchemy 1.0+ including 2.0.x)
             for_update_arg = select._for_update_arg
@@ -682,12 +770,19 @@ class DB2Compiler(compiler.SQLCompiler):
                     sql_ori,
                     flags=re.IGNORECASE,
                 ).strip()
-                sql_work = re.sub(
-                    r"\s+OFFSET\s+(?:\d+|__\[POSTCOMPILE_[^\]]+\]|:[A-Za-z0-9_]+|\?)\s*$",
-                    "",
-                    sql_work,
-                    flags=re.IGNORECASE,
-                )
+                # Remove the base compiler's trailing OFFSET clause, reusing the
+                # text after the LAST OFFSET keyword verbatim in the ROW_NUMBER
+                # predicate. This handles all offset forms (inline int, bound
+                # param, expression) and avoids emitting bound params twice.
+                captured_offset_text = None
+                _offset_kw = None
+                for _offset_kw in re.finditer(
+                    r"\bOFFSET\b", sql_work, flags=re.IGNORECASE
+                ):
+                    pass
+                if _offset_kw is not None:
+                    captured_offset_text = sql_work[_offset_kw.end():].strip()
+                    sql_work = sql_work[: _offset_kw.start()].rstrip()
                 sql_split = re.split(r"[\s+]FROM ", sql_work, 1)
                 if len(sql_split) < 2:
                     logger.debug("Unable to split SELECT for OFFSET rewrite.")
@@ -738,7 +833,14 @@ class DB2Compiler(compiler.SQLCompiler):
                         )
                     return self.process(clause, **kw)
 
-                offset_text = _process_clause_text(offset_clause_obj)
+                # Reuse the OFFSET token captured from the base-compiled SQL.
+                # This keeps the bound parameter single (the base compiler
+                # already registered it); only fall back to processing the
+                # clause if, for some reason, nothing was captured.
+                if captured_offset_text:
+                    offset_text = captured_offset_text
+                else:
+                    offset_text = _process_clause_text(offset_clause_obj)
                 limit_text = _process_clause_text(limit_clause_obj)
                 if offset_text is not None:
                     sql = f'{sql} "{__rownum}" > {offset_text}'
@@ -767,13 +869,10 @@ class DB2Compiler(compiler.SQLCompiler):
     @log_entry_exit
     def visit_sequence(self, sequence, **kw):
         try:
-            schema = sequence.schema
-            name = sequence.name
-            logger.debug(f"Rendering sequence -> schema={schema}, name={name}")
-            if schema:
-                sql = f"NEXT VALUE FOR {schema}.{name}"
-            else:
-                sql = f"NEXT VALUE FOR {name}"
+            # Use preparer.format_sequence to apply identifier quoting and
+            # schema_translate_map; manual naming would bypass schema translation.
+            seq_name = self.preparer.format_sequence(sequence)
+            sql = f"NEXT VALUE FOR {seq_name}"
             logger.debug(f"Generated sequence SQL -> {sql}")
             return sql
         except Exception as e:
@@ -856,7 +955,89 @@ class DB2Compiler(compiler.SQLCompiler):
             logger.exception("Stack trace in visit_cast")
             raise
 
+    @log_entry_exit
+    def visit_truediv_binary(self, binary, operator, **kw):
+        # True division on Db2: cast the divisor to a bounded-precision DECIMAL
+        # so the quotient keeps a non-zero scale (otherwise a bare Numeric()
+        # becomes DECIMAL(31, 0) and "15 / 10" yields 1 instead of 1.5). An
+        # existing Numeric/Float divisor type is reused to preserve its scale.
+        if getattr(self.dialect, "div_is_floordiv", False):
+            from sqlalchemy.sql import elements
+            right = binary.right
+            affinity = right.type._type_affinity
+            if affinity in (sa_types.Numeric, sa_types.Float):
+                cast_type = right.type
+            else:
+                # Bounded precision (< 31) leaves Db2 room to compute a
+                # fractional quotient scale, and a non-zero scale preserves a
+                # fractional divisor whose type affinity was lost - e.g. a
+                # divisor wrapped in nullif(...) in the "untyped_function"
+                # case, where DECIMAL(19, 0) would truncate 3.5 to 3.
+                cast_type = sa_types.Numeric(19, 6)
+            sql = (
+                self.process(binary.left, **kw)
+                + " / "
+                + self.process(elements.Cast(right, cast_type), **kw)
+            )
+            logger.debug(f"Rendered true-division SQL -> {sql}")
+            return sql
+        return super(DB2Compiler, self).visit_truediv_binary(
+            binary, operator, **kw
+        )
+
+    @log_entry_exit
+    def visit_floordiv_binary(self, binary, operator, **kw):
+        # Floor division on Db2: cast both integer operands to INTEGER so Db2
+        # does integer division even for bound params. Non-integer operands
+        # fall through to the base FLOOR(...) implementation.
+        left_type = binary.left.type._type_affinity
+        right_type = binary.right.type._type_affinity
+        if (
+            getattr(self.dialect, "div_is_floordiv", False)
+            and left_type is sa_types.Integer
+            and right_type is sa_types.Integer
+        ):
+            from sqlalchemy.sql import elements
+            left = self.process(
+                elements.Cast(binary.left, sa_types.Integer()), **kw
+            )
+            right = self.process(
+                elements.Cast(binary.right, sa_types.Integer()), **kw
+            )
+            sql = left + " / " + right
+            logger.debug(f"Rendered integer floor-division SQL -> {sql}")
+            return sql
+        return super(DB2Compiler, self).visit_floordiv_binary(
+            binary, operator, **kw
+        )
+
+    @log_entry_exit
+    def render_literal_value(self, value, type_):
+        # ibm_db can't carry non-ASCII chars rendered inline, so emit them as a
+        # Db2 ASCII-only Unicode constant UX'<utf-16-be hex>'. ASCII strings and
+        # non-string values defer to the base impl for normal quoting/escaping.
+        if isinstance(value, str) and not value.isascii():
+            hex_utf16 = value.encode("utf-16-be").hex().upper()
+            sql = "UX'%s'" % hex_utf16
+            logger.debug("Rendering non-ASCII literal as Db2 UX constant")
+            return sql
+        return super(DB2Compiler, self).render_literal_value(value, type_)
+
     def get_select_precolumns(self, select, **kwargs):
+        # DISTINCT ON is PostgreSQL-only. When a non-empty _distinct_on is
+        # present, mirror SQLAlchemy core's behaviour and emit the
+        # deprecation warning (the ON expression is otherwise silently
+        # ignored and a plain DISTINCT is rendered). Without this, the ON
+        # expression would be dropped with no feedback.
+        if getattr(select, "_distinct_on", None):
+            util.warn_deprecated(
+                "DISTINCT ON is currently supported only by the PostgreSQL "
+                "dialect.  Use of DISTINCT ON for other backends is currently "
+                "silently ignored, however this usage is deprecated, and will "
+                "raise CompileError in a future release for all backends "
+                "that do not support this syntax.",
+                version="1.4",
+            )
         distinct_value = select._distinct
         if isinstance(distinct_value, str):
             result = distinct_value.upper() + " "
@@ -868,8 +1049,18 @@ class DB2Compiler(compiler.SQLCompiler):
         return result
 
     @log_entry_exit
-    def visit_join(self, join, asfrom=False, **kwargs):
+    def visit_join(self, join, asfrom=False, from_linter=None, **kwargs):
         try:
+            # Register the join's left/right edge with the FROM linter to
+            # avoid a false cartesian-product warning when the ON clause
+            # references no columns (e.g. true()/false()).
+            if from_linter:
+                from_linter.edges.update(
+                    itertools.product(
+                        _de_clone(join.left._from_objects),
+                        _de_clone(join.right._from_objects),
+                    )
+                )
             join_type = " INNER JOIN "
             if join.full:
                 join_type = " FULL OUTER JOIN "
@@ -881,11 +1072,19 @@ class DB2Compiler(compiler.SQLCompiler):
             )
             sql = "".join(
                 (
-                    self.process(join.left, asfrom=True, **kwargs),
+                    self.process(
+                        join.left, asfrom=True,
+                        from_linter=from_linter, **kwargs
+                    ),
                     join_type,
-                    self.process(join.right, asfrom=True, **kwargs),
+                    self.process(
+                        join.right, asfrom=True,
+                        from_linter=from_linter, **kwargs
+                    ),
                     " ON ",
-                    self.process(join.onclause, **kwargs),
+                    self.process(
+                        join.onclause, from_linter=from_linter, **kwargs
+                    ),
                 )
             )
             logger.debug(f"Generated JOIN SQL -> {sql}")
@@ -894,6 +1093,73 @@ class DB2Compiler(compiler.SQLCompiler):
             logger.error(f"Error rendering JOIN: {e}")
             logger.exception("Stack trace in visit_join")
             raise
+
+    @log_entry_exit
+    def visit_bindparam(self, bindparam, within_columns_clause=False, **kw):
+        text = super(DB2Compiler, self).visit_bindparam(
+            bindparam, within_columns_clause=within_columns_clause, **kw
+        )
+        # Wrap typed binds in a CAST so Db2 can infer the marker's type:
+        # untyped markers in the SELECT projection raise SQL0418N, and
+        # BigInteger binds default to 32-bit INTEGER (overflowing for large
+        # ints), so CAST them to BIGINT regardless of clause position.
+        try:
+            is_bigint = isinstance(bindparam.type, sa_types.BigInteger)
+            if (
+                (within_columns_clause or is_bigint)
+                and not kw.get("literal_binds", False)
+                and "[POSTCOMPILE" not in text
+            ):
+                type_ = bindparam.type
+                # Skip unknown types and variable-length string/binary types
+                # that have no length, which cannot be a bare CAST target in
+                # Db2 (e.g. "CAST(? AS VARCHAR)" is invalid without a length).
+                length_missing = (
+                    isinstance(type_, (sa_types.String, sa_types.LargeBinary))
+                    and getattr(type_, "length", None) is None
+                )
+                # Skip CAST for Numeric binds without precision: Db2 renders
+                # them as DECIMAL(31, 0), truncating fractional values (Float
+                # excluded as it maps to a binary floating type).
+                numeric_without_precision = (
+                    isinstance(type_, sa_types.Numeric)
+                    and not isinstance(type_, sa_types.Float)
+                    and getattr(type_, "precision", None) is None
+                )
+                if (
+                    type_ is not None
+                    and not isinstance(type_, sa_types.NullType)
+                    and not length_missing
+                    and not numeric_without_precision
+                ):
+                    type_compiler = getattr(
+                        self.dialect, "type_compiler_instance", None
+                    ) or self.dialect.type_compiler
+                    type_text = type_compiler.process(type_)
+                    casted = f"CAST({text} AS {type_text})"
+                    logger.debug(f"Wrapped column-clause bind -> {casted}")
+                    return casted
+        except Exception:
+            logger.exception(
+                "Failed to add Db2 bind CAST; falling back to plain marker"
+            )
+        return text
+
+    @log_entry_exit
+    def visit_frame_clause(self, frameclause, **kw):
+        # Db2 requires literal integers in window frame bounds (parameter
+        # markers raise SQL0104N); force literal_execute so binds render inline
+        # without baking values into the cache key. SQLAlchemy 2.1+ only.
+        kw["literal_execute"] = True
+        return super(DB2Compiler, self).visit_frame_clause(frameclause, **kw)
+
+    @log_entry_exit
+    def _format_frame_clause(self, range_, **kw):
+        # SQLAlchemy 1.4 / 2.0 window frame bounds: Db2 rejects parameter markers
+        # here (SQL0104N), so force literal_execute to render bounds inline
+        # (e.g. "ROWS BETWEEN 5 PRECEDING ...") while keeping them out of the cache key.
+        kw["literal_execute"] = True
+        return super(DB2Compiler, self)._format_frame_clause(range_, **kw)
 
     @log_entry_exit
     def visit_savepoint(self, savepoint_stmt):
@@ -940,6 +1206,26 @@ class DB2Compiler(compiler.SQLCompiler):
 
 
 class DB2DDLCompiler(compiler.DDLCompiler):
+
+    @log_entry_exit
+    def visit_create_table_as(self, element, **kw):
+        # Db2 CTAS requires a parenthesized fullselect with a data clause:
+        # "CREATE TABLE t AS (SELECT ...) WITH DATA". Only used on SQLAlchemy 2.1+.
+        prep = self.preparer
+        inner_kw = dict(kw)
+        # Inline literals so the DDL is a self-contained statement.
+        inner_kw["literal_binds"] = True
+        select_sql = self.sql_compiler.process(element.selectable, **inner_kw)
+        parts = [
+            "CREATE TABLE",
+            prep.format_table(element.table),
+            "AS",
+            f"({select_sql})",
+            "WITH DATA",
+        ]
+        sql = " ".join(parts)
+        logger.debug(f"Generated CREATE TABLE AS SQL -> {sql}")
+        return sql
 
     @staticmethod
     @log_entry_exit
@@ -1240,7 +1526,10 @@ class DB2DDLCompiler(compiler.DDLCompiler):
 
 class DB2IdentifierPreparer(compiler.IdentifierPreparer):
    reserved_words = RESERVED_WORDS
-   illegal_initial_characters = set(range(0, 10)).union(["_", "$"])
+   # Db2 regular identifiers must begin with a letter, so a leading digit,
+   # underscore or "$" forces quoting. Must be single-character strings (not
+   # ints) since _requires_quotes tests ``value[0] in illegal_initial_characters``.
+   illegal_initial_characters = set("0123456789").union(["_", "$"])
    def __init__(self, dialect):
        logger.debug("Initializing DB2IdentifierPreparer")
        super(DB2IdentifierPreparer, self).__init__(dialect)
@@ -1251,21 +1540,14 @@ class DB2IdentifierPreparer(compiler.IdentifierPreparer):
        )
 
    def quote_identifier(self, value):
-       """Override to uppercase normalized identifiers before quoting.
-       Db2 folds unquoted identifiers to uppercase, so when we need to quote
-       a name that was stored as lowercase (SQLAlchemy's normalized form),
-       we must uppercase it to match the catalog (e.g., "ROLE" not "role").
-
-       Only case-insensitive names are uppercased.  If the name is a SQLAlchemy
-       ``quoted_name`` that was explicitly marked to preserve quoting
-       (``quote=True``) — i.e. a deliberately case-sensitive identifier — it is
-       left exactly as-is so lowercase-quoted objects still resolve correctly.
-       Mixed-case names are likewise preserved.
-       """
        force_quote = getattr(value, "quote", None)
        if force_quote is not True and value == value.lower():
-           value = value.upper()
-       return self.initial_quote + value + self.final_quote
+          value = value.upper()
+       return (
+          self.initial_quote
+          + self._escape_identifier(value)
+          + self.final_quote
+       )
 
 
 class _SelectLastRowIDMixin(object):
@@ -1349,8 +1631,20 @@ class DB2ExecutionContext(_SelectLastRowIDMixin, default.DefaultExecutionContext
     def fire_sequence(self, seq, type_):
         sequence_name = str(seq)
         try:
-            formatted_seq = self.dialect.identifier_preparer.format_sequence(seq)
+            # Use the schema_translate_map-aware execution-context preparer,
+            # not the dialect's default preparer, to avoid SQL0204N when a
+            # schema_translate_map is active.
+            preparer = self.identifier_preparer
+            formatted_seq = preparer.format_sequence(seq)
             sql = ("SELECT NEXTVAL FOR " + formatted_seq + " FROM SYSIBM.SYSDUMMY1")
+            # Substitute the __[SCHEMA_x] placeholder with the real schema for this raw statement.
+            schema_translate_map = self.execution_options.get(
+                "schema_translate_map", None
+            )
+            if schema_translate_map:
+                sql = preparer._render_schema_translates(
+                    sql, schema_translate_map
+                )
             logger.debug(f"Firing sequence -> name={sequence_name}, Generated SQL={sql}")
             result = self._execute_scalar(sql, type_)
             logger.info(f"Sequence value generated -> name={sequence_name}, value={result}")
@@ -1383,6 +1677,9 @@ class DB2Dialect(default.DefaultDialect):
     supports_native_decimal = False
     supports_native_boolean = False
     supports_statement_cache = True
+    # Db2 persists table/column comments via separate COMMENT ON statements
+    # (no inline syntax), stored in SYSCAT.*.REMARKS.
+    supports_comments = True
     preexecute_sequences = False
     supports_alter = True
     supports_sequences = True

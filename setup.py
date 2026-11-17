@@ -10,7 +10,7 @@ VERSION = re.compile(r".*__version__ = '(.*?)'", re.S).match(v.read()).group(1)
 v.close()
 
 readme = os.path.join(os.path.dirname(__file__), 'README.md')
-sqlalchemy_requirement = "sqlalchemy>=1.3.5,<2.1"
+sqlalchemy_requirement = "sqlalchemy>=1.4,<2.2"
 if 'USE_PYODBC' in os.environ and os.environ['USE_PYODBC'] == '1':
     require = [sqlalchemy_requirement]
 else:
@@ -57,6 +57,6 @@ setup(
        },
        zip_safe=False,
        extras_require={
-           "dev": ["nose>=0.11"]
+           "test": ["pytest>=7.0"]
        }
      )

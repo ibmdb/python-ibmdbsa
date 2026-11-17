@@ -19,6 +19,7 @@
 
 import re
 import warnings
+import decimal
 from collections.abc import MutableMapping, Sequence
 from typing import Any, cast
 
@@ -46,6 +47,7 @@ SQL_TXN_REPEATABLE_READ = 4
 SQL_TXN_SERIALIZABLE = 8
 SQL_ATTR_TXN_ISOLATION = 108
 
+
 class _IBM_Numeric_ibm_db(sa_types.Numeric):
    @log_entry_exit
    def result_processor(self, dialect, coltype):
@@ -62,6 +64,17 @@ class _IBM_Numeric_ibm_db(sa_types.Numeric):
        else:
            logger.debug("Returning float conversion processor")
            return to_float
+
+
+class _IBM_Float_ibm_db(sa_types.Float):
+    """Float mapped explicitly so it keeps Float's own result handling rather
+    than being adapted to the Numeric colspec.
+
+    The bind side is left as pass-through (SQLAlchemy's native behaviour): the
+    executemany homogeneity coercion that ibm_db needs is applied centrally in
+    DB2Dialect_ibm_db.do_executemany, not per value, so a single bound value is
+    never altered (its exact Python type/precision is preserved).
+    """
 
 
 class _IBM_Binary_ibm_db(sa_types._Binary):
@@ -157,6 +170,9 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 class DB2Dialect_ibm_db(DB2Dialect):
     driver = 'ibm_db_sa'
     supports_unicode_statements = True
+    # Pass str binds straight to ibm_db, which handles VARGRAPHIC/DBCLOB
+    # natively; leaving this False on SA 1.4 pre-encodes to UTF-8 bytes and
+    supports_unicode_binds = True
     supports_statement_cache = True
     supports_sane_rowcount = True
     supports_sane_multi_rowcount = False
@@ -176,10 +192,9 @@ class DB2Dialect_ibm_db(DB2Dialect):
             # DECFLOAT is a Numeric but keeps its own processors.
             DECFLOAT: DECFLOAT,
             XML: _IBM_XML_ibm_db,
-            # Float subclasses Numeric; without its own entry it would be
-            # adapted to _IBM_Numeric_ibm_db, which ignores Float's
-            # asdecimal result conversion.
-            sa_types.Float: sa_types.Float,
+            # Keep Float's own result handling (and executemany coercion)
+            # instead of being adapted to _IBM_Numeric_ibm_db.
+            sa_types.Float: _IBM_Float_ibm_db,
         }
     )
 
@@ -188,6 +203,19 @@ class DB2Dialect_ibm_db(DB2Dialect):
         @log_entry_exit
         def dbapi(cls):
             """ Returns: the underlying DBAPI driver module
+
+            SQLAlchemy < 2.0 core calls the ``dbapi()`` classmethod to load the
+            DBAPI module, so it is kept here.
+            """
+            logger.debug("Importing ibm_db_dbi DBAPI module")
+            import ibm_db_dbi as module
+            return module
+
+        @classmethod
+        @log_entry_exit
+        def import_dbapi(cls):
+            """ Returns the underlying DBAPI driver module. Provided under the
+            2.0 name ``import_dbapi()`` so callers resolve it on < 2.0 too.
             """
             logger.debug("Importing ibm_db_dbi DBAPI module")
             import ibm_db_dbi as module
@@ -196,8 +224,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
         @classmethod
         @log_entry_exit
         def import_dbapi(cls):
-            """ Returns: the underlying DBAPI driver module
-            """
+            """ Returns the underlying DBAPI driver module """
             logger.debug("Importing ibm_db_dbi DBAPI module")
             import ibm_db_dbi as module
             return module
@@ -222,6 +249,73 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 cursor.execute(statement)
             else:
                 cursor.execute(statement, parameters)
+
+    @staticmethod
+    def _homogenize_numeric_columns(parameters):
+        """Coerce executemany columns that mix int/float/Decimal to one Python
+        type (Decimal if any value is Decimal, else float) so ibm_db's bulk bind
+        doesn't reject a non-homogeneous batch; uniform columns are left as-is.
+        """
+        if not isinstance(parameters, (list, tuple)) or len(parameters) < 2:
+            return parameters
+        if not all(isinstance(row, (list, tuple)) for row in parameters):
+            return parameters
+        ncols = len(parameters[0])
+        if ncols == 0 or any(len(row) != ncols for row in parameters):
+            return parameters
+
+        rows = [list(row) for row in parameters]
+        changed = False
+        for col in range(ncols):
+            saw_decimal = saw_float = saw_int = saw_other = False
+            for row in rows:
+                value = row[col]
+                if value is None:
+                    continue
+                if isinstance(value, bool):
+                    saw_other = True
+                elif isinstance(value, decimal.Decimal):
+                    saw_decimal = True
+                elif isinstance(value, float):
+                    saw_float = True
+                elif isinstance(value, int):
+                    saw_int = True
+                else:
+                    saw_other = True
+            if saw_other:
+                continue
+            if sum((saw_decimal, saw_float, saw_int)) < 2:
+                continue  # already a single numeric type (or all None)
+            # Unify the column's type: Decimal on SA 2.0+ (lossless, accepted
+            # by the bulk bind), but float on SA 1.4 since ibm_db there can't
+            # bind Decimal to a Db2 FLOAT/DOUBLE column (CLI0100E).
+            if saw_decimal and SA_VERSION_MM >= (2, 0):
+                target = decimal.Decimal
+            else:
+                target = float
+            for row in rows:
+                value = row[col]
+                if value is None or isinstance(value, target):
+                    continue
+                row[col] = (
+                    decimal.Decimal(str(value))
+                    if target is decimal.Decimal
+                    else float(value)
+                )
+            changed = True
+
+        if not changed:
+            return parameters
+        return [tuple(row) for row in rows]
+
+    @log_entry_exit
+    def do_executemany(self, cursor, statement, parameters, context=None):
+        logger.debug("Executing SQL statement (executemany)")
+        # Unify each column to one Python type so ibm_db's bulk bind accepts the
+        # batch (float on SA 1.4, Decimal on 2.0+); see _homogenize_numeric_columns.
+        parameters = self._homogenize_numeric_columns(parameters)
+        cursor.executemany(statement, parameters)
+
 
     @log_entry_exit
     def _get_server_version_info(self, connection):
@@ -348,9 +442,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
     @log_entry_exit
     def _get_default_schema_name(self, connection):
         logger.debug("Fetching current schema from DB2")
-        # Ask the server. ibm_db_dbi's get_current_schema() falls back to the
-        # user argument passed to connect(), which is empty when credentials
-        # are supplied in the DSN, so it can return '' for a valid session.
+        # Ask the server directly, since ibm_db_dbi's get_current_schema() can return '' for DSN-based credentials.
         if hasattr(connection, "exec_driver_sql"):
             result = connection.exec_driver_sql("VALUES CURRENT SCHEMA")
         else:  # SQLAlchemy < 1.4

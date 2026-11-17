@@ -1,4 +1,5 @@
 recursive-include test *.py
 
 include README* LICENSE distribute_setup.py CHANGES* run_tests.py
+include conftest.py requirements-test.txt
 
