@@ -21,6 +21,8 @@ from sqlalchemy import types as sa_types
 from sqlalchemy import sql, util, join
 from sqlalchemy import Table, MetaData, Column
 from sqlalchemy.engine import reflection
+from sqlalchemy.exc import NoSuchTableError
+from sqlalchemy.sql.elements import quoted_name
 from sqlalchemy import *
 from .logger import logger, log_entry_exit
 import re
@@ -53,20 +55,17 @@ class BaseReflector(object):
     def normalize_name(self, name):
         try:
             original_name = name
-            if isinstance(name, str):
-                name = name
             if name is not None:
-                requires_quotes = self.identifier_preparer._requires_quotes(
-                    name.lower()
-                )
-                result = (
-                    name.lower()
-                    if name.upper() == name and not requires_quotes
-                    else name
-                )
+                if name.upper() == name:
+                    # Db2 stores unquoted identifiers in UPPERCASE; fold them to
+                    # lowercase to match SQLAlchemy models (incl. words like REF).
+                    result = name.lower()
+                else:
+                    # Non-uppercase names come from force-quoted identifiers;
+                    # preserve case and mark quoted so they stay case-sensitive.
+                    result = quoted_name(name, quote=True)
                 logger.debug(
                     f"normalize_name -> original={original_name}, "
-                    f"requires_quotes={requires_quotes}, "
                     f"result={result}"
                 )
                 return result
@@ -84,12 +83,12 @@ class BaseReflector(object):
             if name is None:
                 logger.debug("denormalize_name -> input is None")
                 return None
-            lower_name = name.lower()
-            requires_quotes = self.identifier_preparer._requires_quotes(
-                lower_name
-            )
-            if lower_name == name and not requires_quotes:
-                name = name.upper()
+            # Force-quoted identifiers (quote=True) are stored case-sensitively
+            # exactly as written, so leave their case alone. Only ordinary
+            # lowercase names are folded to Db2's stored UPPERCASE form.
+            if not (isinstance(name, quoted_name) and name.quote):
+                if name.lower() == name:
+                    name = name.upper()
             supports_unicode = self.dialect.supports_unicode_binds
             if not supports_unicode:
                 if isinstance(name, str):
@@ -103,7 +102,6 @@ class BaseReflector(object):
                     name = str(name)
             logger.debug(
                 f"denormalize_name -> original={original_name}, "
-                f"requires_quotes={requires_quotes}, "
                 f"supports_unicode_binds={supports_unicode}, "
                 f"result={name}"
             )
@@ -154,6 +152,15 @@ class BaseReflector(object):
         )
         return schema_name
 
+    def _ensure_table_exists(self, connection, table_name, schema, **kw):
+        """Raise NoSuchTableError if the table/view is absent.
+
+        Pass the ORIGINAL (not denormalized) table_name, since has_table
+        denormalizes internally; views count as existing.
+        """
+        if not self.has_table(connection, table_name, schema=schema, **kw):
+            raise NoSuchTableError(table_name)
+
 
 class DB2Reflector(BaseReflector):
     ischema = MetaData()
@@ -186,6 +193,7 @@ class DB2Reflector(BaseReflector):
       Column("SYSTEM_REQUIRED", sa_types.SMALLINT, key="system_required"),
       Column("INDSCHEMA", CoerceUnicode, key="indschema"),
       Column("INDEXTYPE", CoerceUnicode, key="indextype"),
+      Column("NULLKEYS", CoerceUnicode, key="nullkeys"),
       schema="SYSCAT")
 
     sys_indexcoluse = Table("INDEXCOLUSE", ischema,
@@ -271,6 +279,7 @@ class DB2Reflector(BaseReflector):
       Column("SEQNAME", CoerceUnicode, key="seqname"),
       schema="SYSCAT")
 
+    @reflection.cache
     @log_entry_exit
     def has_table(self, connection, table_name, schema=None, **kw):
         try:
@@ -306,9 +315,13 @@ class DB2Reflector(BaseReflector):
             logger.exception("Stack trace in has_table")
             raise
 
+    @reflection.cache
     @log_entry_exit
     def has_sequence(self, connection, sequence_name, schema=None, **kw):
         # SQLAlchemy 2's Inspector passes info_cache and other keywords.
+        # @reflection.cache makes the result participate in the Inspector's
+        # cache (keyed via info_cache) so repeated has_sequence() calls return
+        # the cached value until Inspector.clear_cache() is invoked.
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         sequence_name = self.denormalize_name(sequence_name)
         if current_schema:
@@ -433,6 +446,7 @@ class DB2Reflector(BaseReflector):
     @log_entry_exit
     def get_view_definition(self, connection, viewname, schema=None, **kw):
         try:
+            original_viewname = viewname
             current_schema = self.denormalize_name(schema or self.default_schema_name)
             viewname = self.denormalize_name(viewname)
             logger.debug(f"Fetching view definition -> schema={current_schema}, view={viewname}")
@@ -443,6 +457,9 @@ class DB2Reflector(BaseReflector):
             )
             logger.debug(f"Generated get_view_definition SQL -> {query}")
             definition = connection.execute(query).scalar()
+            if definition is None:
+                # No SYSCAT.VIEWS row: not a view, so raise per SQLAlchemy's contract.
+                raise NoSuchTableError(original_viewname)
             logger.debug(f"View definition length -> {len(definition) if definition else 0}")
             return definition
         except Exception as e:
@@ -453,6 +470,7 @@ class DB2Reflector(BaseReflector):
     @reflection.cache
     @log_entry_exit
     def get_columns(self, connection, table_name, schema=None, **kw):
+        self._ensure_table_exists(connection, table_name, schema, **kw)
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         syscols = self.sys_columns
@@ -533,6 +551,7 @@ class DB2Reflector(BaseReflector):
     def get_pk_constraint(self, connection, table_name, schema=None, **kw):
         # Read the constraint's own name and columns in key order; splitting
         # SYSCAT.INDEXES.COLNAMES on \w+ broke names such as "AMT$X".
+        self._ensure_table_exists(connection, table_name, schema, **kw)
         rows = self._constraint_columns(connection, table_name, schema, 'P')
         return {
             "constrained_columns": [col for _, col in rows],
@@ -576,6 +595,7 @@ class DB2Reflector(BaseReflector):
         # Scope the constrained table by schema and name, and pair columns by
         # key position, so a same-named table in another schema does not
         # contribute its keys and composite keys keep their order.
+        self._ensure_table_exists(connection, table_name, schema, **kw)
         default_schema = self.normalize_name(self.default_schema_name)
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
@@ -696,11 +716,12 @@ class DB2Reflector(BaseReflector):
         # Read columns from SYSCAT.INDEXCOLUSE (splitting COLNAMES on \w+
         # broke names such as "AMT$X" and lost DESC), and skip DB2's internal
         # XML region/path indexes, which are not user indexes.
+        self._ensure_table_exists(connection, table_name, schema, **kw)
         current_schema = self.denormalize_name(schema or self.default_schema_name)
         table_name = self.denormalize_name(table_name)
         idx, cols = self.sys_indexes, self.sys_indexcoluse
         query = (
-            sql.select(idx.c.indname, idx.c.uniquerule, cols.c.colname, cols.c.colorder)
+            sql.select(idx.c.indname, idx.c.uniquerule, idx.c.nullkeys, cols.c.colname, cols.c.colorder)
             .select_from(join(idx, cols, and_(
                 cols.c.indschema == idx.c.indschema,
                 cols.c.indname == idx.c.indname,
@@ -717,12 +738,17 @@ class DB2Reflector(BaseReflector):
             .order_by(idx.c.indname, cols.c.colseq)
         )
         indexes = {}
-        for name, rule, col, order in connection.execute(query):
+        for name, rule, nullkeys, col, order in connection.execute(query):
             index = indexes.setdefault(name, {
                 'name': self.normalize_name(name),
                 'column_names': [],
                 'unique': rule == 'U',
             })
+            # A NULLKEYS='N' unique index backs a UNIQUE constraint (already
+            # reported by get_unique_constraints), so mark it as a duplicate to
+            # avoid a separate Index and a name clash.
+            if rule == 'U' and nullkeys == 'N':
+                index['duplicates_constraint'] = self.normalize_name(name)
             index['column_names'].append(self.normalize_name(col))
             if order == 'D':
                 index.setdefault('column_sorting', {})[self.normalize_name(col)] = ('desc',)
@@ -732,9 +758,44 @@ class DB2Reflector(BaseReflector):
     @log_entry_exit
     def get_unique_constraints(self, connection, table_name, schema=None, **kw):
         constraints = {}
+        self._ensure_table_exists(connection, table_name, schema, **kw)
         for name, col in self._constraint_columns(connection, table_name, schema, 'U'):
             constraints.setdefault(name, []).append(col)
+        # UNIQUE constraints with a nullable column are stored by Db2 as unique
+        # indexes (NULLKEYS='N'); report them here so they reflect as constraints.
+        for name, cols in self._unique_null_key_indexes(connection, table_name, schema):
+            constraints.setdefault(name, cols)
         return [{'name': k, 'column_names': v} for k, v in constraints.items()]
+
+    def _unique_null_key_indexes(self, connection, table_name, schema):
+        """Return (index name, [columns]) for unique indexes with NULLKEYS='N',
+        which back UNIQUE constraints on nullable columns. Plain user indexes
+        (NULLKEYS='Y') are excluded.
+        """
+        current_schema = self.denormalize_name(schema or self.default_schema_name)
+        table_name = self.denormalize_name(table_name)
+        idx, cols = self.sys_indexes, self.sys_indexcoluse
+        query = (
+            sql.select(idx.c.indname, cols.c.colname)
+            .select_from(join(idx, cols, and_(
+                cols.c.indschema == idx.c.indschema,
+                cols.c.indname == idx.c.indname,
+            )))
+            .where(and_(
+                idx.c.tabschema == current_schema,
+                idx.c.tabname == table_name,
+                idx.c.uniquerule == 'U',
+                idx.c.system_required == 0,
+                idx.c.nullkeys == 'N',
+            ))
+            .order_by(idx.c.indname, cols.c.colseq)
+        )
+        result = {}
+        for name, col in connection.execute(query):
+            result.setdefault(
+                self.normalize_name(name), []
+            ).append(self.normalize_name(col))
+        return list(result.items())
 
     @reflection.cache
     @log_entry_exit
