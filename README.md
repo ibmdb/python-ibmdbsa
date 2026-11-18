@@ -9,7 +9,7 @@ Version
 
 Prerequisites
 --------------
-1. Install Python 3.11 to 3.15 or Jython 2.7.x .
+1. Install Python 3.10 to 3.15 or Jython 2.7.x .
 2. SQLAlchemy version between 1.4.x - 2.1.x.
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher.
 
@@ -90,8 +90,8 @@ Testing
 -------
 IBM_DB_SA is tested with SQLAlchemy's pytest-based test suite for third-party
 dialects, including the SQLAlchemy dialect compliance suite
-(`sqlalchemy.testing.suite`). The tests can be run against SQLAlchemy 2.0.x
-and 2.1.x.
+(`sqlalchemy.testing.suite`). The tests can be run against SQLAlchemy 1.4.x,
+2.0.x and 2.1.x.
 
 Quick start, from the root of the repository:
 ```
@@ -246,6 +246,9 @@ Known Limitations in ibm_db_sa adapter for DB2 databases
 5) DEFERRABLE INITIALLY deferred not supported
 6) Subquery in ON clause of LEFT OUTER JOIN not supported
 7) PyODBC support is experimental
+8) A unique index created with EXCLUDE NULL KEYS is reflected as a UNIQUE constraint
+9) Enum columns are created as VARCHAR(n CODEUNITS32) on Db2 LUW, which requires Db2 LUW 10.5 or later. Db2 for z/OS uses VARCHAR(n) and Db2 for i uses VARCHAR(n) CCSID 1208
+10) UnicodeText columns are created as DBCLOB (previously LONG VARGRAPHIC, which is deprecated in Db2)
 
 
 Credits

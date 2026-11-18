@@ -458,10 +458,7 @@ class DB2Reflector(BaseReflector):
             logger.debug(f"Generated get_view_definition SQL -> {query}")
             definition = connection.execute(query).scalar()
             if definition is None:
-                # No row in SYSCAT.VIEWS for this name: the view does not exist
-                # (or the name refers to a table, not a view). SQLAlchemy's
-                # contract for get_view_definition is to raise NoSuchTableError
-                # in that case (test_get_view_definition_does_not_exist).
+                # No SYSCAT.VIEWS row: not a view, so raise per SQLAlchemy's contract.
                 raise NoSuchTableError(original_viewname)
             logger.debug(f"View definition length -> {len(definition) if definition else 0}")
             return definition

@@ -15,8 +15,7 @@ Run the tests with, for example::
 
     pytest --dburi "db2+ibm_db://user:pass@host:50000/DBNAME"
 
-or configure the URL under ``[db] default`` in ``setup.cfg`` and simply
-run ``pytest``.
+or select the named URL from ``setup.cfg`` with ``pytest --db db2``.
 """
 
 from sqlalchemy.dialects import registry
@@ -55,43 +54,44 @@ from sqlalchemy.testing.plugin.pytestplugin import *  # noqa: E402,F401,F403
 # exists. Import for its registration side effects only.
 import ibm_db_sa.provision  # noqa: E402,F401
 
+import os  # noqa: E402
+
 import pytest  # noqa: E402
+from sqlalchemy.testing import config as _sa_config  # noqa: E402
+from sqlalchemy.testing.plugin import pytestplugin as _sa_plugin  # noqa: E402
 
 
-# --- Db2 hard-limit skips that the upstream suite does not gate ------------
-#
-# Db2's maximum DECIMAL precision is 31 digits. A few SQLAlchemy compliance
-# cases deliberately exercise 38-digit DECIMAL arithmetic to pin down
-# true-division behaviour on other backends:
-#
-#   TrueDivTest::test_truediv_divisor[numeric_38_digit_divisor-*]
-#       uses NUMERIC(38, 0) with a 38-digit literal; Db2 rejects it with
-#       SQL0405N ("numeric literal ... is out of range").
-#   TrueDivTest::test_truediv_divisor[numeric_tiny_divisor-*]
-#       uses NUMERIC(38, 20); Db2 rejects the type itself with SQL0604N
-#       ("DECIMAL(38, 20) is not valid").
-#
-# Unlike the sibling ``numeric_many_decimals`` case (which the test marks
-# ``.as_skips()`` via precision_numerics_many_significant_digits), these two
-# combinations carry no requirement, so they cannot be turned off from
-# requirements.py. They are a genuine Db2 limitation, not a dialect bug, so we
-# skip them here by node id. The 31-digit-and-under variants of the same test
-# (float, numeric_whole_number) still run and must keep passing.
+# Db2 DECIMAL precision is capped at 31 digits; these upstream cases need
+# NUMERIC(38, ...) (SQL0405N / SQL0604N) and have no requirement to gate them.
 _DB2_DECIMAL_LIMIT_SKIP_IDS = (
     "test_truediv_divisor[numeric_38_digit_divisor",
     "test_truediv_divisor[numeric_tiny_divisor",
 )
 
+# The compliance suite is only meaningful against Db2, not the sqlite default.
+_DB2_ONLY_FILES = ("test_suite.py",)
 
-def pytest_collection_modifyitems(config, items):  # noqa: D401
-    """Skip the Db2-unsupported 38-digit DECIMAL true-division cases."""
+
+def _is_db2_backend():
+    db = getattr(_sa_config, "db", None)
+    return db is not None and db.dialect.name == "ibm_db_sa"
+
+
+def pytest_collection_modifyitems(session, config, items):
+    # Run SQLAlchemy's hook first: it expands __backend__ classes and applies
+    # __only_on__ / __requires__ gating.
+    _sa_plugin.pytest_collection_modifyitems(session, config, items)
+
     skip_db2_decimal = pytest.mark.skip(
-        reason=(
-            "Db2 DECIMAL precision maximum is 31 digits; this case requires "
-            "NUMERIC(38, ...) which Db2 rejects (SQL0405N / SQL0604N)."
-        )
+        reason="Db2 DECIMAL precision maximum is 31 digits (SQL0405N / SQL0604N)."
     )
+    skip_not_db2 = pytest.mark.skip(
+        reason="Requires a Db2 database; run with --db db2 or --dburi <db2-url>."
+    )
+    is_db2 = _is_db2_backend()
     for item in items:
         if any(tag in item.nodeid for tag in _DB2_DECIMAL_LIMIT_SKIP_IDS):
             item.add_marker(skip_db2_decimal)
+        if not is_db2 and os.path.basename(str(item.fspath)) in _DB2_ONLY_FILES:
+            item.add_marker(skip_not_db2)
 

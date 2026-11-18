@@ -7,7 +7,7 @@ SQLAlchemy's [README.unittests.rst](https://github.com/sqlalchemy/sqlalchemy/blo
 You do not need a copy of the SQLAlchemy source code. The test framework
 (`sqlalchemy.testing`) is part of the installed `sqlalchemy` package.
 
-The test suite runs on SQLAlchemy 2.0.x and 2.1.x.
+The test suite runs on SQLAlchemy 1.4.x, 2.0.x and 2.1.x.
 
 **Contents**
 
@@ -78,6 +78,10 @@ pytest --db db2 test/test_suite.py
 
 `default` is used when neither `--db` nor `--dburi` is given. It is set to
 SQLite so that `test/test_dialect.py` can run without a Db2 server.
+
+> **Note:** A plain `pytest` (without `--db` or `--dburi`) runs against
+> SQLite. In that case the compliance suite (`test/test_suite.py`) and the
+> Db2-only test classes are reported as `skipped`, not run.
 
 > **Note:** Do not commit real user names or passwords to `setup.cfg`.
 
@@ -178,6 +182,9 @@ Install the SQLAlchemy version you want to test, then run the tests as
 usual. No changes to the tests are needed.
 
 ```bash
+pip install "sqlalchemy==1.4.*"
+pytest --db db2 test/
+
 pip install "sqlalchemy==2.0.*"
 pytest --db db2 test/
 

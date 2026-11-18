@@ -2,7 +2,7 @@
 #
 #   pip install -r requirements-test.txt
 #
-# The test suite runs on SQLAlchemy 2.0.x and 2.1.x. To test a specific
+# The test suite runs on SQLAlchemy 1.4.x, 2.0.x and 2.1.x. To test a specific
 # version, install it explicitly, for example:
 #   pip install "sqlalchemy==2.1.*"
 # or the SQLAlchemy development branch:
@@ -10,8 +10,7 @@
 #
 # See README.unittests.md for details.
 
-sqlalchemy>=2.0,<2.2
+sqlalchemy>=1.4,<2.2
 pytest>=7.0
 # Required only for the live-database compliance suite against Db2:
 ibm_db>=2.0.0
-

@@ -170,8 +170,8 @@ class DB2ExecutionContext_ibm_db(DB2ExecutionContext):
 class DB2Dialect_ibm_db(DB2Dialect):
     driver = 'ibm_db_sa'
     supports_unicode_statements = True
-    # Pass str binds straight to ibm_db, which handles VARGRAPHIC/DBCLOB
-    # natively; leaving this False on SA 1.4 pre-encodes to UTF-8 bytes and
+    # Pass str binds straight to ibm_db, which handles VARGRAPHIC/DBCLOB natively;
+    # with False, SA 1.4 pre-encodes str binds to UTF-8 bytes.
     supports_unicode_binds = True
     supports_statement_cache = True
     supports_sane_rowcount = True
@@ -239,8 +239,7 @@ class DB2Dialect_ibm_db(DB2Dialect):
             statement = statement.split('(', 1)[0].split()[1]
             context._callproc_result = cursor.callproc(statement, parameters)
         else:
-            check_server = getattr(DB2Dialect, 'serverType')
-            if ("round(" in statement.casefold()) and check_server == "DB2":
+            if ("round(" in statement.casefold()) and self.dbms_name == "DB2":
                 logger.debug("Applying round() workaround for DB2")
                 value_index = 0
                 while '?' in statement and value_index < len(parameters):
@@ -251,10 +250,22 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 cursor.execute(statement, parameters)
 
     @staticmethod
-    def _homogenize_numeric_columns(parameters):
+    def _bind_types(context):
+        """Return the positional bind types of a compiled statement, or None."""
+        compiled = getattr(context, "compiled", None)
+        positiontup = getattr(compiled, "positiontup", None)
+        bind_names = getattr(compiled, "bind_names", None)
+        if not positiontup or not bind_names:
+            return None
+        by_name = {name: bind for bind, name in bind_names.items()}
+        if any(name not in by_name for name in positiontup):
+            return None
+        return [by_name[name].type for name in positiontup]
+
+    @staticmethod
+    def _homogenize_numeric_columns(parameters, bind_types=None):
         """Coerce executemany columns that mix int/float/Decimal to one Python
-        type (Decimal if any value is Decimal, else float) so ibm_db's bulk bind
-        doesn't reject a non-homogeneous batch; uniform columns are left as-is.
+        type so ibm_db's bulk bind accepts the batch; uniform columns are left as-is.
         """
         if not isinstance(parameters, (list, tuple)) or len(parameters) < 2:
             return parameters
@@ -263,12 +274,19 @@ class DB2Dialect_ibm_db(DB2Dialect):
         ncols = len(parameters[0])
         if ncols == 0 or any(len(row) != ncols for row in parameters):
             return parameters
+        if bind_types is not None and len(bind_types) != ncols:
+            bind_types = None
 
-        rows = [list(row) for row in parameters]
-        changed = False
+        rows = None
         for col in range(ncols):
+            col_type = bind_types[col] if bind_types is not None else None
+            # With known bind types, only Numeric/Float columns are considered
+            # (Float is not a Numeric subclass on SQLAlchemy 2.1).
+            if col_type is not None and not isinstance(col_type, sa_types.NullType):
+                if not isinstance(col_type, (sa_types.Numeric, sa_types.Float)):
+                    continue
             saw_decimal = saw_float = saw_int = saw_other = False
-            for row in rows:
+            for row in parameters:
                 value = row[col]
                 if value is None:
                     continue
@@ -286,13 +304,18 @@ class DB2Dialect_ibm_db(DB2Dialect):
                 continue
             if sum((saw_decimal, saw_float, saw_int)) < 2:
                 continue  # already a single numeric type (or all None)
-            # Unify the column's type: Decimal on SA 2.0+ (lossless, accepted
-            # by the bulk bind), but float on SA 1.4 since ibm_db there can't
-            # bind Decimal to a Db2 FLOAT/DOUBLE column (CLI0100E).
-            if saw_decimal and SA_VERSION_MM >= (2, 0):
+            # DECIMAL columns use Decimal (lossless); FLOAT columns use float, as ibm_db
+            # on SA 1.4 can't bind Decimal to FLOAT/DOUBLE (CLI0100E).
+            if isinstance(col_type, sa_types.Numeric) and not isinstance(
+                col_type, sa_types.Float
+            ):
+                target = decimal.Decimal
+            elif saw_decimal and SA_VERSION_MM >= (2, 0):
                 target = decimal.Decimal
             else:
                 target = float
+            if rows is None:
+                rows = [list(row) for row in parameters]
             for row in rows:
                 value = row[col]
                 if value is None or isinstance(value, target):
@@ -302,18 +325,17 @@ class DB2Dialect_ibm_db(DB2Dialect):
                     if target is decimal.Decimal
                     else float(value)
                 )
-            changed = True
 
-        if not changed:
+        if rows is None:
             return parameters
         return [tuple(row) for row in rows]
 
     @log_entry_exit
     def do_executemany(self, cursor, statement, parameters, context=None):
         logger.debug("Executing SQL statement (executemany)")
-        # Unify each column to one Python type so ibm_db's bulk bind accepts the
-        # batch (float on SA 1.4, Decimal on 2.0+); see _homogenize_numeric_columns.
-        parameters = self._homogenize_numeric_columns(parameters)
+        parameters = self._homogenize_numeric_columns(
+            parameters, self._bind_types(context)
+        )
         cursor.executemany(statement, parameters)
 
 

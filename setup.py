@@ -38,7 +38,7 @@ setup(
          long_description=open(readme).read(),
          platforms='All',
          install_requires= require,
-         python_requires=">=3.9",
+         python_requires=">=3.10",
          packages=['ibm_db_sa'],
         entry_points={
          'sqlalchemy.dialects': [
@@ -57,6 +57,8 @@ setup(
        },
        zip_safe=False,
        extras_require={
-           "test": ["pytest>=7.0"]
+           "test": ["pytest>=7.0"],
+           # Deprecated alias of "test", kept so "ibm_db_sa[dev]" still installs.
+           "dev": ["pytest>=7.0"],
        }
      )

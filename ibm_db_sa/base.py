@@ -31,11 +31,11 @@ from sqlalchemy.sql.elements import BindParameter
 from sqlalchemy.sql import compiler
 from sqlalchemy.sql import operators
 
-# _de_clone strips clone annotations from FROM objects; it may be missing on
-# older SQLAlchemy, so fall back to a no-op returning elements unchanged.
+# _de_clone is present in SQLAlchemy 1.4.x-2.1.x; the fallback only covers
+# releases that predate it.
 try:
     from sqlalchemy.sql.compiler import _de_clone
-except Exception:  # pragma: no cover
+except ImportError:  # pragma: no cover
     def _de_clone(elements):
         return elements
 from sqlalchemy.engine import default
@@ -327,6 +327,14 @@ ischema_names = {
 
 
 class DB2TypeCompiler(compiler.GenericTypeCompiler):
+   def _server_type(self):
+       # Per-dialect server name ("AS", "DB2", "DB2/LINUXX8664", ...); None before connect.
+       return getattr(self.dialect, "dbms_name", None)
+
+   def _is_zos(self):
+       server = self._server_type() or ""
+       return server == "DB2" or server.startswith("DSN")
+
    @log_entry_exit
    def visit_TIMESTAMP(self, type_, **kw):
        sql = "TIMESTAMP"
@@ -363,7 +371,7 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        # (supports_native_boolean=False), and a native BOOLEAN column does not
        # reliably round-trip those 0/1 values through the CLI driver, so store
        # booleans as SMALLINT there. LUW / z-OS keep the native BOOLEAN type.
-       check_server = getattr(DB2Dialect, "serverType", None)
+       check_server = self._server_type()
        sql = "SMALLINT" if check_server == "AS" else "BOOLEAN"
        logger.debug(
            f"Type rendering -> BOOLEAN -> serverType={check_server}, sql={sql}"
@@ -500,12 +508,12 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        # columns with a Unicode CCSID so Unicode/Text/String data round-trips:
        # SBCS/MBCS types use UTF-8 (1208); GRAPHIC types use UTF-16 (1200).
        # This is a no-op on every other Db2 server (LUW / z-OS unchanged).
-       if getattr(DB2Dialect, "serverType", None) != "AS":
+       if self._server_type() != "AS":
            return base_sql
        return f"{base_sql} CCSID {1200 if graphic else 1208}"
 
    def visit_unicode(self, type_, **kw):
-       check_server = getattr(DB2Dialect, "serverType")
+       check_server = self._server_type()
        base_sql = self.visit_VARGRAPHIC(type_, **kw)
        if check_server == "DB2":
            sql = base_sql + " CCSID 1200"
@@ -528,16 +536,15 @@ class DB2TypeCompiler(compiler.GenericTypeCompiler):
        )
 
    def visit_enum(self, type_, **kw):
-       # Render Enum as VARCHAR(n CODEUNITS32) so Db2 counts characters, not
-       # bytes, preventing multi-byte UTF-8 members from overflowing (SQL0302N).
-       # Db2 for i (AS/400) does not accept the CODEUNITS32 string unit in a
-       # column definition (SQL0104N), so emit VARCHAR(n) CCSID 1208 there,
-       # which both parses and stores multi-byte members correctly.
+       # CODEUNITS32 sizes by characters (Db2 LUW 10.5+); Db2 for i and z/OS reject
+       # it in column DDL, so emit VARCHAR(n) there (with CCSID 1208 on Db2 for i).
        length = type_.length
-       check_server = getattr(DB2Dialect, "serverType")
+       check_server = self._server_type()
        if length:
            if check_server == "AS":
                sql = f"VARCHAR({length}) CCSID 1208"
+           elif self._is_zos():
+               sql = f"VARCHAR({length})"
            else:
                sql = f"VARCHAR({length} CODEUNITS32)"
        else:
@@ -585,7 +592,7 @@ class DB2Compiler(compiler.SQLCompiler):
         # because the surrounding predicate can never match.
         if isinstance(type_, sa_types.Integer):
             db_type = "INTEGER"
-        elif isinstance(type_, sa_types.Numeric):
+        elif isinstance(type_, (sa_types.Numeric, sa_types.Float)):
             db_type = "DECIMAL(31, 8)"
         elif isinstance(type_, (sa_types.String, sa_types.Enum)):
             db_type = "VARCHAR(1)"
@@ -735,13 +742,18 @@ class DB2Compiler(compiler.SQLCompiler):
         if offset_text is not None:
             text += f" OFFSET {offset_text}"
             logger.debug(f"Applied OFFSET -> {offset_text}")
+        # Remembered so visit_select can strip exactly this trailing OFFSET.
+        self._db2_last_offset_text = offset_text
         logger.debug(f"Generated LIMIT/OFFSET clause -> {text}")
         return text
 
     @log_entry_exit
     def visit_select(self, select, **kw):
         try:
+            self._db2_last_offset_text = None
             sql_ori = compiler.SQLCompiler.visit_select(self, select, **kw)
+            # LIMIT/OFFSET is rendered last, so this is this SELECT's own offset.
+            rendered_offset_text = self._db2_last_offset_text
             sql_upper = sql_ori.upper()
             logger.debug("Processing SELECT compilation.")
             if ("LIMIT" in sql_upper) or ("FETCH FIRST" in sql_upper):
@@ -770,20 +782,25 @@ class DB2Compiler(compiler.SQLCompiler):
                     sql_ori,
                     flags=re.IGNORECASE,
                 ).strip()
-                # Remove the base compiler's trailing OFFSET clause, reusing the
-                # text after the LAST OFFSET keyword verbatim in the ROW_NUMBER
-                # predicate. This handles all offset forms (inline int, bound
-                # param, expression) and avoids emitting bound params twice.
+                # Strip only this SELECT's trailing OFFSET (any form, e.g. "1 + 2"),
+                # so OFFSETs in subqueries/CTEs are left intact.
                 captured_offset_text = None
-                _offset_kw = None
-                for _offset_kw in re.finditer(
-                    r"\bOFFSET\b", sql_work, flags=re.IGNORECASE
-                ):
-                    pass
-                if _offset_kw is not None:
-                    captured_offset_text = sql_work[_offset_kw.end():].strip()
-                    sql_work = sql_work[: _offset_kw.start()].rstrip()
-                sql_split = re.split(r"[\s+]FROM ", sql_work, 1)
+                offset_suffix = (
+                    f" OFFSET {rendered_offset_text}"
+                    if rendered_offset_text is not None
+                    else None
+                )
+                if offset_suffix and sql_work.endswith(offset_suffix):
+                    captured_offset_text = rendered_offset_text
+                    sql_work = sql_work[: -len(offset_suffix)].rstrip()
+                else:
+                    _offset_kw = re.search(
+                        r"\s+OFFSET\s+(\S+)\s*$", sql_work, flags=re.IGNORECASE
+                    )
+                    if _offset_kw is not None:
+                        captured_offset_text = _offset_kw.group(1)
+                        sql_work = sql_work[: _offset_kw.start()].rstrip()
+                sql_split = re.split(r"[\s+]FROM ", sql_work, maxsplit=1)
                 if len(sql_split) < 2:
                     logger.debug("Unable to split SELECT for OFFSET rewrite.")
                     logger.debug(f"Final SELECT SQL -> {sql_ori}")
@@ -833,10 +850,7 @@ class DB2Compiler(compiler.SQLCompiler):
                         )
                     return self.process(clause, **kw)
 
-                # Reuse the OFFSET token captured from the base-compiled SQL.
-                # This keeps the bound parameter single (the base compiler
-                # already registered it); only fall back to processing the
-                # clause if, for some reason, nothing was captured.
+                # Reuse the captured token so the OFFSET bind is not registered twice.
                 if captured_offset_text:
                     offset_text = captured_offset_text
                 else:
@@ -981,6 +995,11 @@ class DB2Compiler(compiler.SQLCompiler):
             )
             logger.debug(f"Rendered true-division SQL -> {sql}")
             return sql
+        # SQLAlchemy 1.4 has no base visit_truediv_binary; render a plain "/".
+        if not hasattr(compiler.SQLCompiler, "visit_truediv_binary"):
+            return self._generate_generic_binary(
+                binary, compiler.OPERATORS[operator], **kw
+            )
         return super(DB2Compiler, self).visit_truediv_binary(
             binary, operator, **kw
         )
@@ -1139,7 +1158,7 @@ class DB2Compiler(compiler.SQLCompiler):
                     casted = f"CAST({text} AS {type_text})"
                     logger.debug(f"Wrapped column-clause bind -> {casted}")
                     return casted
-        except Exception:
+        except (exc.CompileError, NotImplementedError):
             logger.exception(
                 "Failed to add Db2 bind CAST; falling back to plain marker"
             )
@@ -1209,8 +1228,15 @@ class DB2DDLCompiler(compiler.DDLCompiler):
 
     @log_entry_exit
     def visit_create_table_as(self, element, **kw):
-        # Db2 CTAS requires a parenthesized fullselect with a data clause:
-        # "CREATE TABLE t AS (SELECT ...) WITH DATA". Only used on SQLAlchemy 2.1+.
+        # Db2 CTAS form: "CREATE TABLE t AS (SELECT ...) WITH DATA" (SQLAlchemy 2.1+).
+        if getattr(element, "temporary", False):
+            raise exc.CompileError(
+                "Db2 dialect does not support CREATE TEMPORARY TABLE ... AS"
+            )
+        if getattr(element, "if_not_exists", False):
+            raise exc.CompileError(
+                "Db2 dialect does not support CREATE TABLE IF NOT EXISTS ... AS"
+            )
         prep = self.preparer
         inner_kw = dict(kw)
         # Inline literals so the DDL is a self-contained statement.
@@ -1540,13 +1566,14 @@ class DB2IdentifierPreparer(compiler.IdentifierPreparer):
        )
 
    def quote_identifier(self, value):
+       """Quote an identifier, folding plain lowercase names to Db2's UPPERCASE form."""
        force_quote = getattr(value, "quote", None)
        if force_quote is not True and value == value.lower():
-          value = value.upper()
+           value = value.upper()
        return (
-          self.initial_quote
-          + self._escape_identifier(value)
-          + self.final_quote
+           self.initial_quote
+           + self._escape_identifier(value)
+           + self.final_quote
        )
 
 
@@ -1723,6 +1750,7 @@ class DB2Dialect(default.DefaultDialect):
                 logger.info(
                     f"Connected to DB Server -> name={self.dbms_name}, version={self.dbms_ver}"
                 )
+            # Kept for backward compatibility only; compilers read self.dialect.dbms_name.
             DB2Dialect.serverType = self.dbms_name
             super(DB2Dialect, self).initialize(connection)
             logger.debug(
