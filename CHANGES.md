@@ -1,3 +1,27 @@
+2026-11-27, Version 0.5.0
+=========================
+
+ * Bump pypa/gh-action-pypi-publish in /.github/workflows (#207) (dependabot[bot])
+
+ * Add SQLAlchemy 2.1.x support and SQLAlchemy test suite integration (#206) (bchoudhary6415)
+
+ * Fix DB2 LUW reflection, binary binds and XML/DECFLOAT results (#205) (Amin Ghadersohi)
+
+ * Keep Float(asdecimal=True) result conversion with the ibm_db driver; declare DOUBLE as Float (#202) (Amin Ghadersohi)
+
+ * Read the default schema from the server with the ibm_db driver (#203) (Amin Ghadersohi)
+
+ * Remove the zxJDBC dialect and its entry points (#204) (Amin Ghadersohi)
+
+ * Fix exact Decimal binding with the ibm_db driver (#201) (Amin Ghadersohi)
+
+ * Fix version-agnostic FOR UPDATE and quote reserved word 'role' (#200) (bchoudhary6415)
+
+ * Refactored create_connect_args to fix a few bugs, (#199) (bdholder)
+
+ * Fix CLI0109E in has_table() when table_name exceeds max Db2 identifier length (#197) (bchoudhary6415)
+
+
 2026-03-18, Version 0.4.4
 =========================
 

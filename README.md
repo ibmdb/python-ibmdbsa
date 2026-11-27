@@ -5,7 +5,7 @@ The IBM_DB_SA adapter provides the Python/SQLAlchemy interface to IBM Data Serve
 
 Version
 --------
-0.4.4 (2026/03/18)
+0.5.0 (2026/03/18)
 
 Prerequisites
 --------------
@@ -13,7 +13,7 @@ Prerequisites
 2. SQLAlchemy version between 1.4.x - 2.1.x.
 3. IBM_DB driver and IBM_DB_DBI wrapper 1.0.1 or higher.
 
-Note: Older SQLAlchemy versions are supported by IBM_DB_SA versions up to and including 0.4.4. Starting with versions after 0.4.4, IBM_DB_SA supports SQLAlchemy 1.4.x through 2.1.x.
+Note: Older SQLAlchemy versions are supported by IBM_DB_SA versions up to and including 0.4.4. Starting with version 0.5.0, IBM_DB_SA supports SQLAlchemy 1.4.x through 2.1.x.
 
 ```
    Install ibm_db driver with below commands:
